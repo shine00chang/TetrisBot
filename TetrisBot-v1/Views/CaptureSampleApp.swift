@@ -11,8 +11,7 @@ struct CaptureSampleApp: App {
     var body: some Scene {
         WindowGroup {
             CaptureView()
-                .frame(minWidth: 960, minHeight: 724, alignment: .center)
+                .frame(minWidth: 800, minHeight: 700, alignment: .center)
         }
-        
     }
 }

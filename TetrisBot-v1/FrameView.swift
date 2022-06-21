@@ -9,9 +9,9 @@ import SwiftUI
 
 struct FrameView: NSViewRepresentable {
     
-    let frame: IOSurface
+    @ObservedObject var frame: FrameData
     
-    init(_ frame: IOSurface) {
+    init(_ frame: FrameData) {
         self.frame = frame
     }
     
@@ -20,11 +20,11 @@ struct FrameView: NSViewRepresentable {
         if view.layer == nil {
             view.makeBackingLayer()
         }
-        view.layer?.contents = frame
+        view.layer?.contents = frame.surface
         return view
     }
     
     func updateNSView(_ nsView: NSView, context: Context) {
-        nsView.layer?.contents = frame
+        nsView.layer?.contents = frame.surface
     }
 }

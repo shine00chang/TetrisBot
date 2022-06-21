@@ -9,68 +9,64 @@ import SwiftUI
 import ScreenCaptureKit
 import OSLog
 import Combine
+import AppTrackingTransparency
+
+var bot: Bot = Bot()
 
 struct CaptureView: View {
     
-    @StateObject var screenRecorder = ScreenRecorder()
+    @StateObject var screenRecorder: ScreenRecorder = ScreenRecorder()
+    
     @State var availableContent: SCShareableContent?
-    @State var captureConfig = CaptureConfiguration()
+    @State var targetWindow: SCWindow?
     @State var error: Error?
     @State var timer: Cancellable?
+     
+    @State var grayScale: Bool = true {
+        didSet {
+            Task () {
+                await screenRecorder.stopCapture()
+                screenRecorder.grayscale = grayScale
+                await screenRecorder.startCapture(with: targetWindow)
+            }
+        }
+    }
     
     private let logger = Logger()
+    
+    init () {
+    }
     
     var filteredWindows: [SCWindow]? {
         availableContent?.windows.sorted {
             $0.owningApplication?.applicationName ?? "" < $1.owningApplication?.applicationName ?? ""
         }
         .filter {
-            $0.owningApplication != nil && $0.owningApplication?.applicationName != ""
+            $0.owningApplication != nil && $0.owningApplication?.applicationName != "" && $0.owningApplication?.applicationName != "Control Center"
         }
     }
     
     var body: some View {
-        ScrollView {
+        VStack {
             Form {
-                Picker("Capture Type", selection: $captureConfig.captureType) {
-                    Text("Entire Display")
-                        .tag(CaptureType.display)
-                    Text("Independent Window")
-                        .tag(CaptureType.independentWindow)
-                }
-                
-                switch captureConfig.captureType {
-                case .display:
-                    Picker("Display", selection: $captureConfig.display) {
-                        ForEach(availableContent?.displays ?? [], id: \.self) { display in
-                            Text("\(display.width) x \(display.height)")
-                                .tag(SCDisplay?.some(display))
-                        }
-                    }
-                    
-                    Toggle("Remove this app from the stream", isOn: $captureConfig.filterOutOwningApplication)
-                    
-                case .independentWindow:
-                    Picker("Window", selection: $captureConfig.window) {
-                        ForEach(filteredWindows ?? [], id: \.self) { window in
-                            Text(window.displayName)
-                                .tag(SCWindow?.some(window))
-                        }
+                Picker("Window", selection: $targetWindow) {
+                    ForEach(filteredWindows ?? [], id: \.self) { window in
+                        Text(window.displayName)
+                            .tag(SCWindow?.some(window))
                     }
                 }
-                
                 HStack {
                     if screenRecorder.isRecording {
                         Button("Update Stream") {
                             Task {
-                                await screenRecorder.update(with: captureConfig)
+                                await screenRecorder.update(with: targetWindow)
                             }
                         }
                     } else {
                         Button("Start Stream") {
                             error = nil
                             Task {
-                                await screenRecorder.startCapture(with: captureConfig)
+                                await screenRecorder.startCapture(with: targetWindow)
                             }
                         }
                     }
@@ -81,9 +77,18 @@ struct CaptureView: View {
                         }
                     }
                     .disabled(!screenRecorder.isRecording)
+
+                    Button("Refresh Available Content") {
+                        refreshAvailableContent();
+                    }
                 }
+                Toggle("Show Gray Scale", isOn: $grayScale)
+                    .toggleStyle(SwitchToggleStyle())
+                Text("Average Frame Data Extraction Time: \(self.screenRecorder.averageFrameDataExtractionTime)")
+                bot.controlPannelView
             }
-            
+            Divider()
+            // Error Messages
             if let error = screenRecorder.error {
                 Text(error.localizedDescription)
                     .foregroundColor(.red)
@@ -93,12 +98,24 @@ struct CaptureView: View {
                 Text(error.localizedDescription)
                     .foregroundColor(.red)
             }
-            
-            if let frame = screenRecorder.latestFrame {
-                FrameDataView(frame)
-                    .padding()
-                FrameView(frame.surface)
-                    .aspectRatio(frame.contentRect.size, contentMode: .fit)
+        }
+        Divider()
+        HStack {
+            // Image view
+            if let frame = screenRecorder.frameData {
+                VStack {
+                    FrameDataView(frame: frame)
+                        .padding()
+                    Divider()
+                    bot.dataView
+                }
+                Divider()
+                
+                if let img = frame.image {
+                    Image(decorative: img, scale: 1.0)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                }
             }
         }
         .padding()
@@ -117,14 +134,9 @@ struct CaptureView: View {
                 availableContent = try await SCShareableContent.excludingDesktopWindows(false,
                                                                                         onScreenWindowsOnly: true)
                 
-                // Store the first available display in the local settings.
-                if captureConfig.display == nil {
-                    captureConfig.display = availableContent?.displays.first
-                }
-                
                 // Store the first available window in the local settings.
-                if captureConfig.window == nil {
-                    captureConfig.window = availableContent?.windows.first
+                if targetWindow == nil {
+                    targetWindow = availableContent?.windows.first
                 }
             } catch {
                 self.error = error

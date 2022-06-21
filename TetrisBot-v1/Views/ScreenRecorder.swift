@@ -8,26 +8,22 @@ An object that captures a stream of screen content.
 import Foundation
 import ScreenCaptureKit
 import OSLog
+import VideoToolbox
+import Accelerate
 
-enum CaptureType {
-    case independentWindow
-    case display
-}
+let divisor: Int32 = 0x1000
+let fDivisor = Float(divisor)
 
-struct CaptureConfiguration {
-    var captureType: CaptureType = .display
-    var display: SCDisplay?
-    var window: SCWindow?
-    var filterOutOwningApplication = true
-}
+var coefficientsMatrix = [
+    Int16(0.2126 * fDivisor),
+    Int16(0.7152 * fDivisor),
+    Int16(0.0722 * fDivisor)
+]
 
-struct CapturedFrame {
-    var sampleBuffer: CMSampleBuffer
-    var surface: IOSurface
-    var contentRect: CGRect
-    var displayTime: TimeInterval
-    var contentScale: Double
-    var scaleFactor: Double
+
+struct Position {
+    var x: Int
+    var y: Int
 }
 
 class ScreenRecorder: NSObject, ObservableObject {
@@ -39,28 +35,30 @@ class ScreenRecorder: NSObject, ObservableObject {
             errorDescription = description
         }
     }
+    @Published var frameData: FrameData?
+    @Published var error: Error?
+    @Published var isRecording = false
+    @Published var averageFrameDataExtractionTime: Double = 0;
     
-    @MainActor @Published var latestFrame: CapturedFrame?
-    @MainActor @Published var error: Error?
-    @MainActor @Published var isRecording = false
-
+    var grayscale: Bool = true
+    
     private var stream: SCStream?
     private let logger = Logger()
     private var cpuStartTime = mach_absolute_time()
     private let frameOutputQueue = DispatchQueue(label: "frame-handling")
-    
+
     /// - Tag: StartCapture
     @MainActor
-    func startCapture(with captureConfig: CaptureConfiguration) async {
+    func startCapture(with window: SCWindow?) async {
         error = nil
         isRecording = false
         
         do {
             // Create the content filter with the sample app settings.
-            let filter = try await contentFilter(for: captureConfig)
+            let filter = try await contentFilter(for: window)
             
             // Create the stream configuration with the sample app settings.
-            let streamConfig = streamConfiguration(for: captureConfig)
+            let streamConfig = streamConfiguration(for: window)
             
             // Create a capture stream with the filter and stream configuration.
             stream = SCStream(filter: filter, configuration: streamConfig, delegate: self)
@@ -81,10 +79,10 @@ class ScreenRecorder: NSObject, ObservableObject {
     
     /// - Tag: UpdateCaptureConfig
     @MainActor
-    func update(with captureConfig: CaptureConfiguration) async {
+    func update(with window: SCWindow?) async {
         do {
-            let filter = try await contentFilter(for: captureConfig)
-            let streamConfig = streamConfiguration(for: captureConfig)
+            let filter = try await contentFilter(for: window)
+            let streamConfig = streamConfiguration(for: window)
             try await stream?.updateConfiguration(streamConfig)
             try await stream?.updateContentFilter(filter)
         } catch {
@@ -96,7 +94,6 @@ class ScreenRecorder: NSObject, ObservableObject {
     @MainActor
     func stopCapture() async {
         isRecording = false
-        
         do {
             try await stream?.stopCapture()
         } catch {
@@ -106,39 +103,11 @@ class ScreenRecorder: NSObject, ObservableObject {
     }
     
     /// - Tag: CreateContentFilter
-    private func contentFilter(for config: CaptureConfiguration) async throws -> SCContentFilter {
+    private func contentFilter(for window: SCWindow?) async throws -> SCContentFilter {
         let filter: SCContentFilter
-        
-        if let display = config.display {
-
-            // Create a content filter that includes all content from the display,
-            // excluding the sample app's window.
-            if config.filterOutOwningApplication {
-
-                // Get the content that's available to capture.
-                let content = try await SCShareableContent.excludingDesktopWindows(false,
-                                                                                   onScreenWindowsOnly: true)
-                
-                // Exclude the sample app by matching the bundle identifier.
-                let excludedApps = content.applications.filter { app in
-                    Bundle.main.bundleIdentifier == app.bundleIdentifier
-                }
-                
-                // Create a content filter that excludes the sample app.
-                filter = SCContentFilter(display: display,
-                                         excludingApplications: excludedApps,
-                                         exceptingWindows: [])
-                
-            } else {
-                // Create a content filter that includes the entire display.
-                filter = SCContentFilter(display: display, excludingWindows: [])
-            }
-            
-        } else if let window = config.window {
-            
+        if let window = window {
             // Create a content filter that includes a single window.
             filter = SCContentFilter(desktopIndependentWindow: window)
-            
         } else {
             throw ScreenRecorderError("The configuration doesn't provide a display or window.")
         }
@@ -146,17 +115,11 @@ class ScreenRecorder: NSObject, ObservableObject {
     }
     
     /// - Tag: CreateStreamConfiguration
-    private func streamConfiguration(for captureConfig: CaptureConfiguration) -> SCStreamConfiguration {
+    private func streamConfiguration(for window: SCWindow?) -> SCStreamConfiguration {
         let streamConfig = SCStreamConfiguration()
         
-        // Set the capture size to twice the display size to support retina displays.
-        if let display = captureConfig.display, captureConfig.captureType == .display {
-            streamConfig.width = display.width * 2
-            streamConfig.height = display.height * 2
-        }
-        
-        // Set the capture interval at 60 fps.
-        streamConfig.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(60))
+        // Set the capture interval at 20 fps.
+        streamConfig.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(20))
         
         // Increase the depth of the frame queue to ensure high fps at the expense of increasing
         // the memory footprint of WindowServer.
@@ -177,7 +140,8 @@ extension ScreenRecorder: SCStreamOutput {
         
     /// - Tag: DidOutputSampleBuffer
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
-
+        
+        let startTime = mach_absolute_time()
         guard sampleBuffer.isValid else {
             logger.log("The sample buffer is invalid.")
             return
@@ -222,7 +186,6 @@ extension ScreenRecorder: SCStreamOutput {
             logger.error("Failed to get a display time from the sample buffer.")
             return
         }
-
         let elapsedTime = convertToSeconds(displayTime) - convertToSeconds(cpuStartTime)
 
         guard let contentScale = attachments[.contentScale] as? Double else {
@@ -234,24 +197,40 @@ extension ScreenRecorder: SCStreamOutput {
             logger.error("Failed to get the scaleFactor from the sample buffer.")
             return
         }
-
         // Force-cast the IOSurfaceRef to IOSurface.
         let surface = unsafeBitCast(surfaceRef, to: IOSurface.self)
+        toGrayscale(pixelBuffer)
+        var image: CGImage? = nil
+        VTCreateCGImageFromCVPixelBuffer(pixelBuffer,
+                                         options: nil,
+                                         imageOut: &image)
+        if image == nil {
+            logger.error("Failed to create CGImage from pixelBuffer.")
+            return
+        }
+
         
         // Publish the new captured frame.
         DispatchQueue.main.async {
-            self.latestFrame = CapturedFrame(sampleBuffer: sampleBuffer,
+            self.frameData = FrameData(pixelBuffer: pixelBuffer,
                                              surface: surface,
+                                             image: image!,
                                              contentRect: contentRect,
                                              displayTime: elapsedTime,
                                              contentScale: contentScale,
                                              scaleFactor: scaleFactor)
+            if isValidGameFrame(self.frameData!) {
+                bot.getGame(from: self.frameData!.pixelBuffer)
+                Bot.markGridPoints(for: self.frameData!.pixelBuffer)
+            }
+            self.averageFrameDataExtractionTime += self.convertToSeconds( mach_absolute_time() - startTime );
+            self.averageFrameDataExtractionTime /= 2;
+            //print("Game Data Extraction Time: \(self.convertToSeconds( mach_absolute_time() - startTime ))")
         }
     }
 }
 
 extension ScreenRecorder: SCStreamDelegate {
-    
     func stream(_ stream: SCStream, didStopWithError error: Error) {
         DispatchQueue.main.async {
             self.logger.error("Stream stopped with error: \(error.localizedDescription)")
