@@ -85,6 +85,7 @@ struct CaptureView: View {
                 Toggle("Show Gray Scale", isOn: $grayScale)
                     .toggleStyle(SwitchToggleStyle())
                 Text("Average Frame Data Extraction Time: \(self.screenRecorder.averageFrameDataExtractionTime)")
+                Text("Average Solver Time: \(bot.averageSolveTime)")
                 bot.controlPannelView
             }
             Divider()

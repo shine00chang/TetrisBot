@@ -133,7 +133,7 @@ struct Keycode {
     static let keypad9                   : UInt16 = 0x5C
 }
 
-func PressKey (key: CGKeyCode, hold: Int = 10) {
+func PressKey (key: CGKeyCode, hold: Int = 100) {
     let keyDown = CGEvent(
         keyboardEventSource: nil,
         virtualKey: key,
@@ -156,6 +156,7 @@ func PressKey (key: CGKeyCode, hold: Int = 10) {
 func PressKeys (keys: [UInt16]) {
     for key in keys {
         PressKey(key: key);
+        usleep(1000);
     }
 }
 
@@ -192,15 +193,16 @@ func PlacePiece (command: C_SolverOutput) {
     for _ in 0..<r {
         keys.append(Keycode.upArrow);
     }
-    if (x < 0) {
-        for _ in 0..<abs(x) {
+    if (x < 4) {
+        for _ in 0..<abs(4-x) {
             keys.append(Keycode.leftArrow)
         }
     } else {
-        for _ in 0..<abs(x) {
+        for _ in 0..<abs(x-4) {
             keys.append(Keycode.rightArrow)
         }
     }
     keys.append(Keycode.space)
+    print(keys);
     PressKeys(keys: keys)
 }

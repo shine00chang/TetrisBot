@@ -26,6 +26,13 @@ struct Position {
     var y: Int
 }
 
+func machTimeToSeconds(_ machTime: UInt64) -> TimeInterval {
+    var timebase = mach_timebase_info_data_t()
+    mach_timebase_info(&timebase)
+    let nanoseconds = machTime * UInt64(timebase.numer) / UInt64(timebase.denom)
+    return Double(nanoseconds) / Double(kSecondScale)
+}
+
 class ScreenRecorder: NSObject, ObservableObject {
     
     struct ScreenRecorderError: Error {
@@ -127,13 +134,6 @@ class ScreenRecorder: NSObject, ObservableObject {
         
         return streamConfig
     }
-    
-    private func convertToSeconds(_ machTime: UInt64) -> TimeInterval {
-        var timebase = mach_timebase_info_data_t()
-        mach_timebase_info(&timebase)
-        let nanoseconds = machTime * UInt64(timebase.numer) / UInt64(timebase.denom)
-        return Double(nanoseconds) / Double(kSecondScale)
-    }
 }
 
 extension ScreenRecorder: SCStreamOutput {
@@ -186,7 +186,7 @@ extension ScreenRecorder: SCStreamOutput {
             logger.error("Failed to get a display time from the sample buffer.")
             return
         }
-        let elapsedTime = convertToSeconds(displayTime) - convertToSeconds(cpuStartTime)
+        let elapsedTime = machTimeToSeconds(displayTime) - machTimeToSeconds(cpuStartTime)
 
         guard let contentScale = attachments[.contentScale] as? Double else {
             logger.error("Failed to get the contentScale from the sample buffer.")
@@ -221,11 +221,11 @@ extension ScreenRecorder: SCStreamOutput {
                                              scaleFactor: scaleFactor)
             if isValidGameFrame(self.frameData!) {
                 bot.getGame(from: self.frameData!.pixelBuffer)
+                print("bot.getGame called.")
                 Bot.markGridPoints(for: self.frameData!.pixelBuffer)
             }
-            self.averageFrameDataExtractionTime += self.convertToSeconds( mach_absolute_time() - startTime );
+            self.averageFrameDataExtractionTime += machTimeToSeconds( mach_absolute_time() - startTime );
             self.averageFrameDataExtractionTime /= 2;
-            //print("Game Data Extraction Time: \(self.convertToSeconds( mach_absolute_time() - startTime ))")
         }
     }
 }
@@ -239,3 +239,5 @@ extension ScreenRecorder: SCStreamDelegate {
         }
     }
 }
+
+

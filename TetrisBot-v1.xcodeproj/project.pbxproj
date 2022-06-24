@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		1C01FCB02857DFA400109DBF /* GameData.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1C01FCAF2857DFA400109DBF /* GameData.mm */; };
+		1C2B667C28627D8200AD09B6 /* Maps.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1C2B667A28627D8200AD09B6 /* Maps.cpp */; };
 		1C9061D92831F26800ACD18F /* ImageHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C9061D82831F26800ACD18F /* ImageHelpers.swift */; };
 		1CA2AF92282CD84900718223 /* Bot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CA2AF91282CD84900718223 /* Bot.swift */; };
 		1CAED0AE28382AD40096855E /* Controller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CAED0AD28382AD40096855E /* Controller.swift */; };
@@ -24,6 +25,8 @@
 /* Begin PBXFileReference section */
 		1C01FCAE2857DF9C00109DBF /* GameData.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GameData.h; sourceTree = "<group>"; };
 		1C01FCAF2857DFA400109DBF /* GameData.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = GameData.mm; sourceTree = "<group>"; };
+		1C2B667A28627D8200AD09B6 /* Maps.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Maps.cpp; sourceTree = "<group>"; };
+		1C2B667B28627D8200AD09B6 /* Maps.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Maps.hpp; sourceTree = "<group>"; };
 		1C9061D82831F26800ACD18F /* ImageHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageHelpers.swift; sourceTree = "<group>"; };
 		1CA2AF91282CD84900718223 /* Bot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bot.swift; sourceTree = "<group>"; };
 		1CAED0AD28382AD40096855E /* Controller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Controller.swift; sourceTree = "<group>"; };
@@ -71,6 +74,8 @@
 			children = (
 				1CD31A182857FF0A00E68F78 /* Solver.hpp */,
 				1CD31A172857FF0A00E68F78 /* Solver.cpp */,
+				1C2B667B28627D8200AD09B6 /* Maps.hpp */,
+				1C2B667A28627D8200AD09B6 /* Maps.cpp */,
 			);
 			path = Solver;
 			sourceTree = "<group>";
@@ -183,6 +188,7 @@
 			files = (
 				1C9061D92831F26800ACD18F /* ImageHelpers.swift in Sources */,
 				1C01FCB02857DFA400109DBF /* GameData.mm in Sources */,
+				1C2B667C28627D8200AD09B6 /* Maps.cpp in Sources */,
 				1CD31A192857FF0A00E68F78 /* Solver.cpp in Sources */,
 				1CAED0AE28382AD40096855E /* Controller.swift in Sources */,
 				C4B0DAC0276BA4B50015082A /* ScreenRecorder.swift in Sources */,

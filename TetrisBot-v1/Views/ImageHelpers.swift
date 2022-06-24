@@ -23,7 +23,7 @@ extension Color {
     }
 }
 enum Piece : Int32 {
-    case I = 1, O = 2, L = 3, J = 4, S = 5, Z = 6, T = 7, None = 0
+    case J = 1, L = 2, S = 3, Z = 4, T = 5, I = 6, O = 7, None = 0
 }
 let greyToPieceMap: [Int: Piece] = [
     136: .I,
