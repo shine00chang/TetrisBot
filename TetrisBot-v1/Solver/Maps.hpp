@@ -12,7 +12,11 @@
 #include <stdio.h>
 #include <vector>
 
-typedef std::vector<std::vector<int>> Piece_map;
-extern const std::vector<Piece_map> piece_maps;
+typedef std::vector<std::vector<int>> Map;
+typedef std::pair<int,int> Pos;
+
+extern const std::vector<Map> piece_maps;
+extern const Map tsd_maps;
+extern const Pos kick_table[6][4][5];
 
 #endif /* Maps_hpp */

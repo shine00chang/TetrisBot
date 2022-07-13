@@ -23,7 +23,7 @@ extension Color {
     }
 }
 enum Piece : Int32 {
-    case J = 1, L = 2, S = 3, Z = 4, T = 5, I = 6, O = 7, None = 0
+    case J = 1, L = 2, S = 3, Z = 4, T = 5, I = 6, O = 7, Garbage = 8, None = 0
 }
 let greyToPieceMap: [Int: Piece] = [
     136: .I,
@@ -32,11 +32,15 @@ let greyToPieceMap: [Int: Piece] = [
     158: .O,
      75: .J,
      74: .J,
+    117: .L,
     118: .L,
+    119: .L,
     147: .S,
      84: .Z,
      83: .Z,
-     86: .T
+     86: .T,
+    106: .Garbage,
+    107: .Garbage
 ]
 func greyToPiece (_ grey: Int) -> Piece {
     if greyToPieceMap[grey] != nil {
@@ -52,6 +56,7 @@ let pieceColor: [Piece: Int] = [
     .S: 0x34ae70ff,
     .Z: 0x3d2ec6ff,
     .T: 0x8637a1ff,
+    .Garbage: 0x6B6B6Bff,
     .None: 0xffffffff
 ]
 

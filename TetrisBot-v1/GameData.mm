@@ -12,15 +12,26 @@
 @implementation C_GameData
 -(id) init {
     self = [super init];
+    if (self) {
+        self->grid = new int* [20];
+        for (int i=0; i<20; i++)
+            grid[i] = new int[10];
+    }
     return self;
 }
--(int) getPiece {
-    return self->piece;
+-(void) dealloc {
+    delete grid;
 }
 -(void) setGrid: (int)x :(int)y :(int) val {
     self->grid[y][x] = val;
 }
 -(void) setPiece: (const int) val {
     self->piece = val;
+}
+-(void) setHold: (const int) val {
+    self->hold = val;
+}
+-(void) setWeight: (int)i val:(double)val {
+    self->weights[i] = val;
 }
 @end

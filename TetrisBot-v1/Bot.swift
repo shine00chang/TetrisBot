@@ -15,9 +15,52 @@ import SwiftUI
 let kGridPos = Position(x: 244, y: 432)
 let kGridSize = 48
 
+let kWeights = 16
+let kWeightLabels:[String] = [
+    "height",
+    "height_H2",
+    "height_Q4",
+    "holes",
+    "hole_depth",
+    "hole_depth_sq",
+    "clear1",
+    "clear2",
+    "clear3",
+    "clear4",
+    "bumpiness",
+    "bumpiness_sq",
+    "max_well_depth",
+    "well_depth",
+    "tspin_double",
+    "tspin_completion_sq"
+];
+let kWeightDefaults:[Double] = [
+    30,
+    150,
+    511,
+    400,
+    50,
+    5,
+    -230,
+    -200,
+    -160,
+    400,
+    40,
+    14,
+    50,
+    15,
+    600,
+    50,
+];
+
+
 class GameData: ObservableObject {
-    @Published var grid: [[Piece]] = []
-    @Published var piece: Piece = .None
+    @Published var grid: [[Piece]] = [];
+    @Published var piece: Piece = .None;
+    @Published var hold: Piece = .None;
+    @Published var newGrid: Bool = false;
+    @Published var over: Bool = false;
+    @Published var blank: Bool = true;
     
     init () {
         for _ in 0..<20 {
@@ -43,15 +86,32 @@ func printGrid (_ grid:[[Piece]]) {
 
 class Bot: ObservableObject {
     
-    @Published var gameData: GameData = GameData()
-    @State var c_gameData: C_GameData = C_GameData()
-    @Published var output: C_SolverOutput = C_SolverOutput(-1,r:-1);
+    @Published var weights: [String];
+    @Published var moveWaitTimeInput: String = "0.1";
     
-    @State var initialized : Bool = false
+    @State var c_gameData: C_GameData = C_GameData();
+    @Published var output: C_SolverOutput = C_SolverOutput(-1,r:-1, hold:false, spin:0);
+    
+    @Published var waitTimeoutLimitInput = "0.2";
+    @Published var waitTimeoutLimit = 0.2;
     @Published var averageSolveTime: Double = 0.0
+    
+    @Published var errorMessage: String? = nil;
 
-    // Wait time between moves (in seconds)
-    let moveDelay: Double = 1.0 / 10
+    var lastMoveHadSpin = false;
+    var lastMoveTime: UInt64 = 0;
+    var moveWaitTime: Double = 0;
+    var movesRequested: Int = 0;
+    var moveNumber: Int = 0;
+    
+    init () {
+        var weights: [String] = []
+        for weightDefault in kWeightDefaults {
+            weights.append(String(format: "%f", weightDefault));
+        }
+        self.weights = weights;
+    }
+    
  
     static func markGridPoints (for buffer: CVPixelBuffer) {
         for y in 0...19 {
@@ -61,16 +121,31 @@ class Bot: ObservableObject {
                 editPixelBuffer(for: buffer, at: pos, size: Position(x: 3,y: 3), to: 255)
             }
         }
+        var pos = Position(x: kGridPos.x - kGridSize*3,
+                           y: kGridPos.y + kGridSize*1 + kGridSize/2);
+        editPixelBuffer(for: buffer, at: pos, size: Position(x: 3,y: 3), to: 255);
+        pos = Position(x: kGridPos.x - kGridSize*3,
+                       y: kGridPos.y + kGridSize*2 + kGridSize/2);
+        editPixelBuffer(for: buffer, at: pos, size: Position(x: 3,y: 3), to: 255);
+        pos = Position(x: kGridPos.x + kGridSize*12 + kGridSize/2,
+                       y: kGridPos.y + kGridSize*1 + kGridSize/2);
+        editPixelBuffer(for: buffer, at: pos, size: Position(x: 3,y: 3), to: 255);
+        pos = Position(x: kGridPos.x + kGridSize*12 + kGridSize/2,
+                       y: kGridPos.y + kGridSize*2 + kGridSize/2);
+        editPixelBuffer(for: buffer, at: pos, size: Position(x: 3,y: 3), to: 255);
     }
     
-    func getGrid (from buffer: CVPixelBuffer) -> [[Piece]] {
+    static func getGrid (from buffer: CVPixelBuffer) -> [[Piece]] {
         var grid: [[Piece]] = []
         var colors: [[Int]] = []
+        gameData.over = true;
+        gameData.blank = true;
+        
         for y in 0...19 {
             grid.append([])
             colors.append([])
             for x in 0...9 {
-                if (y == 0 || y == 1) {
+                if (y == 0 || y == 1 || y == 2) {
                     grid[y].append(.None);
                     continue;
                 }
@@ -79,15 +154,27 @@ class Bot: ObservableObject {
                 let greyVal = Int(readPixelBuffer(for: buffer, at: pos))
                 colors[y].append(greyVal)
                 grid[y].append(greyToPiece(greyVal))
+                if (grid[y][x] != gameData.grid[y][x]) {
+                    gameData.newGrid = true;
+                }
+                if (grid[y][x] != .None && grid[y][x] != .Garbage) {
+                    gameData.over = false;
+                }
+                if (grid[y][x] != .None) {
+                    gameData.blank = false;
+                }
             }
         }
         print(" --- Bot.getGrid result:")
+        if (gameData.newGrid == true) {
+            print(" --- NEW: ---");
+        }
         printGrid(grid)
         print(" --- ")
+         
         return grid
     }
-    
-    func getPiece (from buffer: CVPixelBuffer) -> Piece {
+    static func getPiece (from buffer: CVPixelBuffer) -> Piece {
         for y in 0...19 {
             let pos = Position(x: kGridPos.x + kGridSize*4 + kGridSize/2,
                                y: kGridPos.y + kGridSize*y + kGridSize/2)
@@ -100,35 +187,169 @@ class Bot: ObservableObject {
         }
         return gameData.piece;
     }
-    func getGame (from buffer: CVPixelBuffer) {
-        self.gameData.grid = getGrid(from: buffer)
-        self.gameData.piece = getPiece(from: buffer)
+    static func getHold (from buffer: CVPixelBuffer) -> Piece {
+        // The hold piece always has one block on -2, 1 or -3, 1, thus, we can look at those two points
+        // to identify the hold piece. We do not need a (+kGridSize/2) for the x axis because jstris's
+        // UI has an gap between hold piece and board, roughly half of kGridSize.
+        var pos = Position(x: kGridPos.x - kGridSize*3,
+                           y: kGridPos.y + kGridSize*1 + kGridSize/2)
+        var greyVal = Int(readPixelBuffer(for: buffer, at: pos))
+        var piece = greyToPiece(greyVal);
+        if (piece != .None && piece != .Garbage) {
+            return piece
+        }
+        pos = Position(x: kGridPos.x - kGridSize*3,
+                       y: kGridPos.y + kGridSize*2 + kGridSize/2)
+        greyVal = Int(readPixelBuffer(for: buffer, at: pos))
+        piece = greyToPiece(greyVal);
+        if (piece != .None && piece != .Garbage) {
+            return piece
+        }
+        // Preview 1
+        // Preview 1 always has one block on 12, 1 or 12, 2.
+        pos = Position(x: kGridPos.x + kGridSize*13 + kGridSize/2,
+                       y: kGridPos.y + kGridSize    + kGridSize/2)
+        greyVal = Int(readPixelBuffer(for: buffer, at: pos))
+        piece = greyToPiece(greyVal);
+        if (piece != .None && piece != .Garbage) {
+            return piece
+        }
+        pos = Position(x: kGridPos.x + kGridSize*13 + kGridSize/2,
+                       y: kGridPos.y + kGridSize*2  + kGridSize/2)
+        greyVal = Int(readPixelBuffer(for: buffer, at: pos))
+        piece = greyToPiece(greyVal);
+        if (piece != .None && piece != .Garbage) {
+            return piece
+        }
+        return .None;
     }
-    func runSolver (iterations: Int = 0, delay: Double = 0) async {
+    static func getGame (from buffer: CVPixelBuffer) {
+        gameData.grid = getGrid(from: buffer)
+        gameData.piece = getPiece(from: buffer)
+        gameData.hold = getHold(from: buffer)
+    }
+    func checkRun () {
+        // if game over
+        if (gameData.over && !gameData.blank) {
+            moveNumber = 0;
+            movesRequested = 0;
+        }
+        // if not over
+        if (moveNumber < movesRequested) {
+            let timeSinceLastMove = machTimeToSeconds(mach_absolute_time() - lastMoveTime);
+            
+            // if new frame available
+            if (gameData.newGrid) {
+                // if last move had spin, drop frame
+                if (lastMoveHadSpin) {
+                    print("passed, last move had spin");
+                    lastMoveHadSpin = false;
+                    gameData.newGrid = false;
+                    return;
+                }
+                print("Published Task")
+                let delay : Double = max(0, moveWaitTime - timeSinceLastMove);
+                if (delay == 0) {
+                    runSolverNow();
+                    lastMoveTime = mach_absolute_time();
+                    moveNumber += 1;
+                } else {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [self] in
+                        runSolverNow();
+                        lastMoveTime = mach_absolute_time();
+                        moveNumber += 1;
+                    }
+                }
+                gameData.newGrid = false;
+                // if waited too long (most likely the last frame's output was not properly executed)
+            } else if (timeSinceLastMove >= waitTimeoutLimit) {
+                print("waited too long, running solver now.");
+                runSolverNow();
+                lastMoveTime = mach_absolute_time();
+                moveNumber += 1;
+            }
+        }
+    }
+    
+    func runSolverNow () {
+        let startTime = mach_absolute_time();
+        translateGameData();
+        output = SolverDelegate.runSolver(self.c_gameData);
+        let solveTime = machTimeToSeconds( mach_absolute_time() - startTime );
+        print("Swift received result, got x:\(output.getx()) r:\(output.getr()) hold:\(output.gethold()) spin:\(output.getspin()) after \(solveTime)");
+        self.lastMoveHadSpin = output.getspin() == 0 ? false : true;
+        PlacePiece(command: output);
+        
+        self.averageSolveTime = solveTime + self.averageSolveTime / 2.0;
+    }
+
+    func runSolverAsync (iterations: Int = 1, delay: Double = 0, first: Bool = true)  {
         if (iterations == 0) {
             return;
         }
-            
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [self] in
-            
-            let startTime = mach_absolute_time();
-            print("Swift invoked Solver at \(DispatchTime.now().uptimeNanoseconds / 1_000_000_000), awaiting result...");
-
-            translateGameData();
-            output = SolverDelegate.runSolver(self.c_gameData);
-            let solveTime = machTimeToSeconds( mach_absolute_time() - startTime );
-            print("Swift received result, got x:\(output.getx()) r:\(output.getr()) after \(solveTime)");
-
-            PlacePiece(command: output);
-            
-            let elapsedTime = machTimeToSeconds( mach_absolute_time() - startTime );
-            self.averageSolveTime = solveTime + self.averageSolveTime / 2.0;
-            
-            let waitTime = self.moveDelay - elapsedTime;
-            print("wait time: \(waitTime)");
-            Task.init {
-                await runSolver(iterations: iterations-1, delay: waitTime);
+        if (first) {
+            self.errorMessage = nil;
+            print("weight -----")
+            for i in 0..<kWeights {
+                if let weight = Double(weights[i]) {
+                    c_gameData.setWeight(Int32(i), val:weight);
+                    print("weight \(i): \(weight)");
+                } else {
+                    errorMessage = "INVALID WEIGHT. NOT A DOUBLE: \(weights[i])";
+                    return;
+                }
             }
+            if let moveWaitTime = Double(moveWaitTimeInput) {
+                self.moveWaitTime = moveWaitTime;
+            } else {
+                errorMessage = "INVALID WAITTIME. NOT A DOUBLE: \(moveWaitTimeInput)";
+                return;
+            }
+            
+            if let waitTimeoutLimit = Double(waitTimeoutLimitInput) {
+                self.waitTimeoutLimit = waitTimeoutLimit;
+            } else {
+                errorMessage = "INVALID TIMEOUT. NOT A DOUBLE: \(waitTimeoutLimitInput)";
+                return;
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [self] in
+            let startTime = mach_absolute_time();
+            runSolverNow();
+            
+            let waitTime = self.moveWaitTime - machTimeToSeconds(mach_absolute_time() - startTime);
+            print("wait time: \(waitTime)");
+            runSolverAsync(iterations: iterations-1, delay: waitTime, first: false);
+        }
+    }
+    func startPlay(moves: Int = 1) {
+        self.movesRequested = moves;
+        self.moveNumber = 0;
+        self.lastMoveTime = mach_absolute_time();
+        
+        self.errorMessage = nil;
+        print("weight -----")
+        for i in 0..<kWeights {
+            if let weight = Double(weights[i]) {
+                c_gameData.setWeight(Int32(i), val:weight);
+                print("weight \(i): \(weight)");
+            } else {
+                errorMessage = "INVALID WEIGHT. NOT A DOUBLE: \(weights[i])";
+                return;
+            }
+        }
+        if let moveWaitTime = Double(moveWaitTimeInput) {
+            self.moveWaitTime = moveWaitTime;
+        } else {
+            errorMessage = "INVALID WAITTIME. NOT A DOUBLE: \(moveWaitTimeInput)";
+            return;
+        }
+        
+        if let waitTimeoutLimit = Double(waitTimeoutLimitInput) {
+            self.waitTimeoutLimit = waitTimeoutLimit;
+        } else {
+            errorMessage = "INVALID TIMEOUT. NOT A DOUBLE: \(waitTimeoutLimitInput)";
+            return;
         }
     }
     func translateGameData() {
@@ -138,47 +359,42 @@ class Bot: ObservableObject {
             }
         }
         c_gameData.setPiece(gameData.piece.rawValue);
+        c_gameData.setHold(gameData.hold.rawValue);
     }
     
-    let blockSize: CGFloat = 10
-    var dataView : some View {
-        VStack (spacing: 2) {                
-            Divider()
-            
-            Text("Current Piece: \(gameData.piece.rawValue)")
-            ForEach (gameData.grid, id: \.self) { row in
-                HStack (spacing: 2) {
-                    ForEach (row, id: \.self) { cell in
-                        Rectangle()
-                            .fill(Color(color: pieceColor[cell]!))
-                            .frame(width: self.blockSize, height: self.blockSize)
-                            .padding(CGFloat(0))
-                    }
-                }
-            }
-        }
-    }
+
     var controlPannelView : some View {
         VStack {
             Text("Solver Control Pannel: ")
                 .font(.subheadline)
             HStack (spacing: 10) {
+                Button("Run async 1x") {
+                    self.runSolverAsync(iterations: 1)
+                }
+                Button("Run async 20x") {
+                    self.runSolverAsync(iterations: 20);
+
+                }
+                Button("Run async 120x") {
+                    self.runSolverAsync(iterations: 120);
+                }
                 Button("Run 1x") {
-                    Task.init {
-                        await self.runSolver(iterations: 1)
-                    }
+                    self.startPlay(moves: 1);
                 }
                 Button("Run 20x") {
-                    Task.init {
-                        await self.runSolver(iterations: 20);
-                    }
+                    self.startPlay(moves: 20);
                 }
                 Button("Run 120x") {
-                    Task.init {
-                        await self.runSolver(iterations: 120);
-                    }
+                    self.startPlay(moves: 120);
                 }
             }
         }
+    }
+}
+
+extension String: Identifiable {
+    public typealias ID = Int
+    public var id: Int {
+        return hash
     }
 }

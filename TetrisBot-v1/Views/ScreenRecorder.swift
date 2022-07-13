@@ -42,6 +42,8 @@ class ScreenRecorder: NSObject, ObservableObject {
             errorDescription = description
         }
     }
+    
+    var bot: Bot? = nil;
     @Published var frameData: FrameData?
     @Published var error: Error?
     @Published var isRecording = false
@@ -220,9 +222,9 @@ extension ScreenRecorder: SCStreamOutput {
                                              contentScale: contentScale,
                                              scaleFactor: scaleFactor)
             if isValidGameFrame(self.frameData!) {
-                bot.getGame(from: self.frameData!.pixelBuffer)
-                print("bot.getGame called.")
+                Bot.getGame(from: self.frameData!.pixelBuffer);
                 Bot.markGridPoints(for: self.frameData!.pixelBuffer)
+                self.bot?.checkRun();
             }
             self.averageFrameDataExtractionTime += machTimeToSeconds( mach_absolute_time() - startTime );
             self.averageFrameDataExtractionTime /= 2;

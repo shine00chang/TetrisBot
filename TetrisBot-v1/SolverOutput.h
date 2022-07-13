@@ -12,10 +12,14 @@
 @interface C_SolverOutput : NSObject{
 @public int x;
 @public int r;
+@public bool hold;
+@public int spin;
 }
--(id) init: (int)x r:(int)r;
+-(id) init: (int)x r:(int)r hold:(bool)hold spin:(int)spin;
 -(int) getx;
 -(int) getr;
+-(bool) gethold;
+-(int) getspin;
 @end
 
 #endif /* SolverOutput_h */

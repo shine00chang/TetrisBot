@@ -11,17 +11,18 @@ import OSLog
 import Combine
 import AppTrackingTransparency
 
-var bot: Bot = Bot()
+var gameData: GameData = GameData();
 
 struct CaptureView: View {
-    
+
+    @StateObject var bot: Bot = Bot()
     @StateObject var screenRecorder: ScreenRecorder = ScreenRecorder()
-    
+        
     @State var availableContent: SCShareableContent?
     @State var targetWindow: SCWindow?
     @State var error: Error?
     @State var timer: Cancellable?
-     
+             
     @State var grayScale: Bool = true {
         didSet {
             Task () {
@@ -31,12 +32,9 @@ struct CaptureView: View {
             }
         }
     }
-    
+
     private let logger = Logger()
-    
-    init () {
-    }
-    
+
     var filteredWindows: [SCWindow]? {
         availableContent?.windows.sorted {
             $0.owningApplication?.applicationName ?? "" < $1.owningApplication?.applicationName ?? ""
@@ -102,13 +100,45 @@ struct CaptureView: View {
         }
         Divider()
         HStack {
+            // Bot Control
+            ScrollView {
+                if let errorMessage = bot.errorMessage {
+                    Text(errorMessage)
+                        .foregroundColor(.red);
+                }
+                TextField("Piece per Second", text: $bot.moveWaitTimeInput)
+                    .onReceive(Just(bot.moveWaitTimeInput)) { newValue in
+                        let filtered = newValue.filter { "0123456789.".contains($0) }
+                        if (filtered != bot.moveWaitTimeInput) {
+                            bot.moveWaitTimeInput = filtered;
+                        }
+                 }
+                TextField("Piece per Second", text: $bot.waitTimeoutLimitInput)
+                    .onReceive(Just(bot.waitTimeoutLimitInput)) { newValue in
+                        let filtered = newValue.filter { "0123456789.".contains($0) }
+                        if (filtered != bot.waitTimeoutLimitInput) {
+                            bot.waitTimeoutLimitInput = filtered;
+                        }
+                 }
+                // Weight control
+                ForEach(bot.weights.indices, id: \.self) { index in
+                    HStack {
+                        Text(kWeightLabels[index]);
+                        TextField("",
+                                  text: $bot.weights[index]);
+                        Text(bot.weights[index]);
+                    }
+                    Divider();
+                }
+            }
+            Divider()
             // Image view
             if let frame = screenRecorder.frameData {
                 VStack {
                     FrameDataView(frame: frame)
                         .padding()
                     Divider()
-                    bot.dataView
+                    DataView()
                 }
                 Divider()
                 
@@ -125,6 +155,7 @@ struct CaptureView: View {
                                              interval: .seconds(3)) {
                 refreshAvailableContent()
             }
+            screenRecorder.bot = self.bot;
         }
     }
     

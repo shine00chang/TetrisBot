@@ -8,7 +8,7 @@
 
 #include "Maps.hpp"
 
-const Piece_map mapJ = {
+const Map mapJ = {
 std::vector<int>{
     // origin
     1,0,0,
@@ -34,7 +34,7 @@ std::vector<int>{
     1,1,0
 }
 };
-const Piece_map mapL = {
+const Map mapL = {
 std::vector<int>{
     // origin
     0,0,1,
@@ -60,7 +60,7 @@ std::vector<int>{
     0,1,0
 }
 };
-const Piece_map mapS = {
+const Map mapS = {
 std::vector<int>{
     0,1,1,
     1,1,0,
@@ -82,7 +82,7 @@ std::vector<int>{
     0,1,0
 }
 };
-const Piece_map mapZ = {
+const Map mapZ = {
 std::vector<int>{
     1,1,0,
     0,1,1,
@@ -104,7 +104,7 @@ std::vector<int>{
     1,0,0
 }
 };
-const Piece_map mapT = {
+const Map mapT = {
 std::vector<int>{
     0,1,0,
     1,1,1,
@@ -126,7 +126,7 @@ std::vector<int>{
     0,1,0
 }
 };
-const Piece_map mapI = {
+const Map mapI = {
 std::vector<int>{
     0,0,0,0,0,
     0,0,0,0,0,
@@ -156,7 +156,7 @@ std::vector<int>{
     0,0,1,0,0,
 }
 };
-const Piece_map mapO = {
+const Map mapO = {
     std::vector<int>{
     0,1,1,
     0,1,1,
@@ -179,7 +179,7 @@ const Piece_map mapO = {
     }
 };
 
-const std::vector<Piece_map> piece_maps {
+const std::vector<Map> piece_maps {
     mapJ,
     mapL,
     mapS,
@@ -187,4 +187,203 @@ const std::vector<Piece_map> piece_maps {
     mapT,
     mapI,
     mapO,
+};
+
+
+
+const Map tsd_maps = {
+    std::vector<int>{
+        1,0,0,
+        0,0,0,
+        1,0,1,
+    },
+    std::vector<int>{
+        0,0,1,
+        0,0,0,
+        1,0,1,
+    }
+};
+
+// SRS kick table NOTE: no O's
+const Pos kick_table [6][4][5] = {
+    { // J L S Z T
+        {
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0)
+        },
+        {
+            Pos( 0, 0),
+            Pos( 1, 0),
+            Pos( 1,-1),
+            Pos( 0, 2),
+            Pos( 1, 2)
+        },
+        {
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0)
+        },
+        {
+            Pos( 0, 0),
+            Pos(-1, 0),
+            Pos(-1,-1),
+            Pos( 0, 2),
+            Pos(-1, 2)
+        },
+    },
+    { // J L S Z T
+        {
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0)
+        },
+        {
+            Pos( 0, 0),
+            Pos( 1, 0),
+            Pos( 1,-1),
+            Pos( 0, 2),
+            Pos( 1, 2)
+        },
+        {
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0)
+        },
+        {
+            Pos( 0, 0),
+            Pos(-1, 0),
+            Pos(-1,-1),
+            Pos( 0, 2),
+            Pos(-1, 2)
+        },
+    },
+    { // J L S Z T
+        {
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0)
+        },
+        {
+            Pos( 0, 0),
+            Pos( 1, 0),
+            Pos( 1,-1),
+            Pos( 0, 2),
+            Pos( 1, 2)
+        },
+        {
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0)
+        },
+        {
+            Pos( 0, 0),
+            Pos(-1, 0),
+            Pos(-1,-1),
+            Pos( 0, 2),
+            Pos(-1, 2)
+        },
+    },
+    { // J L S Z T
+        {
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0)
+        },
+        {
+            Pos( 0, 0),
+            Pos( 1, 0),
+            Pos( 1,-1),
+            Pos( 0, 2),
+            Pos( 1, 2)
+        },
+        {
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0)
+        },
+        {
+            Pos( 0, 0),
+            Pos(-1, 0),
+            Pos(-1,-1),
+            Pos( 0, 2),
+            Pos(-1, 2)
+        },
+    },
+    { // J L S Z T
+        {
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0)
+        },
+        {
+            Pos( 0, 0),
+            Pos( 1, 0),
+            Pos( 1,-1),
+            Pos( 0, 2),
+            Pos( 1, 2)
+        },
+        {
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 0)
+        },
+        {
+            Pos( 0, 0),
+            Pos(-1, 0),
+            Pos(-1,-1),
+            Pos( 0, 2),
+            Pos(-1, 2)
+        },
+    },
+    { // I
+        {
+            Pos( 0, 0),
+            Pos(-1, 0),
+            Pos( 2, 0),
+            Pos(-1, 0),
+            Pos( 2, 0)
+        },
+        {
+            Pos(-1, 0),
+            Pos( 0, 0),
+            Pos( 0, 0),
+            Pos( 0, 1),
+            Pos( 0,-2)
+        },
+        {
+            Pos(-1, 1),
+            Pos( 1, 1),
+            Pos(-2, 1),
+            Pos( 1, 0),
+            Pos(-2, 0),
+        },
+        {
+            Pos( 0, 1),
+            Pos( 0, 1),
+            Pos( 0, 1),
+            Pos( 0,-1),
+            Pos( 0, 2),
+        },
+    },
 };

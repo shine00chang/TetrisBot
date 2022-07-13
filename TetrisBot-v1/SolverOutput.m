@@ -10,10 +10,12 @@
 #include "SolverOutput.h"
 
 @implementation C_SolverOutput : NSObject
--(id) init: (int)x r:(int)r {
+-(id) init: (int)x r:(int)r hold:(bool)hold spin:(int)spin{
     self = [super init];
     self->x = x;
     self->r = r;
+    self->spin = spin;
+    self->hold = hold;
     return self;
 }
 -(int) getx{
@@ -21,5 +23,11 @@
 }
 -(int) getr{
     return self->r;
+}
+-(bool) gethold{
+    return self->hold;
+}
+-(int) getspin {
+    return self->spin;
 }
 @end

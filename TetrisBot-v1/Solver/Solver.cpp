@@ -9,19 +9,54 @@
 #include "Solver.hpp"
 #include "Maps.hpp"
 #include <vector>
+#include <list>
+
+//#define SOLVER_LOG
 
 using namespace std;
 
-// height sum, bumpiness, clears, holes
-const vector<int> weights {-40, -25, 200, -400};
+const string pieceName [9] = {
+    "None",
+    "L",
+    "J",
+    "S",
+    "Z",
+    "T",
+    "I",
+    "O",
+    "Garbage"
+};
+const Weights default_weights = Weights();
 
 
-Solver::Input::Input (int g[20][10], int p) {
+Input::Input (int **g, int p, int h, double *w) {
     grid = Grid(20, vector<Piece_t>(10));
     for (int y=0; y<20; y++)
         for (int x=0; x<10; x++)
             grid[y][x] = static_cast<Piece_t>( g[y][x] );
     piece = static_cast<Piece_t>( p );
+    hold = static_cast<Piece_t>( h );
+    
+    if (w == nullptr)
+        weights = default_weights;
+    else {
+        weights.height = -w[0];
+        weights.height_H2 = -w[1];
+        weights.height_Q4 = -w[2];
+        weights.holes = -w[3];
+        weights.hole_depth = -w[4];
+        weights.hole_depth_sq = -w[5];
+        weights.clear1 = w[6];
+        weights.clear2 = w[7];
+        weights.clear3 = w[8];
+        weights.clear4 = w[9];
+        weights.bumpiness = -w[10];
+        weights.bumpiness_sq = -w[11];
+        weights.max_well_depth = w[12];
+        weights.well_depth = w[13];
+        weights.tspin_double = w[14];
+        weights.tspin_completion_sq = w[15];
+    }
 };
 
 void Solver::printGrid(Grid* grid) {
@@ -37,23 +72,35 @@ void Solver::printGrid(Grid* grid) {
     }
 }
 
-Grid* Solver::place(Grid& ref, Piece_t piece, int i_x, int r) {
+void Solver::processNode(Grid *grid, GridInfo *info, bool isRoot) {
+    // Find well
+    int wellpos = -1;
+    int welldepth = 0;
+
+    info->wellpos = wellpos;
+    info->welldepth = welldepth;
+    
+    if (isRoot) return;
+    Solver::checkClears(grid, info);
+}
+
+tuple<Grid*, Pos> Solver::place(Grid& ref, Piece_t piece, int i_x, int r) {
     Grid *grid = new Grid(ref);
-    const vector<int> &piece_map = piece_maps[static_cast<int>(piece)-1][r];
+    const vector<int> &piece_map = piece_maps[int(piece)-1][r];
     int n = piece == Piece_t::I ? 5 : 3;
     int c_x = i_x - (piece == Piece_t::I ? 2 : 1);
     
     // finds the first conflicting y-pos, stores in c_y
     // Then subtracts by a constant offset to get the center_y
-    int c_y = 2;
+    int c_y = 0;
     bool clear = true;
     while (clear && c_y < 20) {
         for (int y=0; y<n && clear; y++)
             for (int x=0; x<n && clear; x++)
                 if (piece_map[y*n +x]) {
                     if (c_x + x < 0 || c_x + x >= 10)
-                        return nullptr;
-                    if (c_y + y < 0 || c_y + y >= 20) {
+                        return make_tuple(nullptr, Pos(0,0));
+                    if (c_y + y >= 20) {
                         clear = false;
                         continue;
                     }
@@ -62,78 +109,275 @@ Grid* Solver::place(Grid& ref, Piece_t piece, int i_x, int r) {
                 }
         c_y ++;
     }
-    c_y -= (piece == Piece_t::I ? 2 : 1) + 1;
+    // because of the last "c_y++", the codeblock above sets c_y to the level after the first OVERLAP
+    // as such, to get the first CONTACT level we must subtract by two.
+    c_y -= 2;
+    // however because we never checked if level "-1" has overlaps, we cannot use it.
+    if (c_y < 0)
+        return make_tuple(nullptr, Pos(0,0));
+    
     for (int y=0; y<n; y++)
         for (int x=0; x<n; x++)
-            if (piece_map[y*n +x])
+            if (piece_map[y*n +x]) {
+                if (c_y + y < 0) // if past board limit (game over)
+                    return make_tuple(nullptr, Pos(0,0));
                 (*grid)[c_y + y][c_x + x] = piece;
-    return grid;
+            }
+    return make_tuple(grid, Pos(c_x, c_y));
 }
 
-int Solver::evaluate(const vector<int>* weights, Grid* grid) {
-    vector<int> heights (10,0);
+void Solver::checkClears(Grid* grid, GridInfo* gridInfo) {
     int clears = 0;
-    int holes = 0;
-    
-    // calculate heights, holes, and clears
-    for (int y=0; y<20; y++) {
+    for (int y=19; y>=0; y--) {
         bool clear = true;
         for (int x=0; x<10; x++) {
-            if ((*grid)[y][x] != Piece_t::None && heights[x] == 0)
-                heights[x] = 20 - y;
-            if (y)
-                if ((*grid)[y][x] == Piece_t::None && (*grid)[y-1][x] != Piece_t::None)
-                    holes ++;
             if ((*grid)[y][x] == Piece_t::None)
                 clear = false;
+            if (clears) {
+                (*grid)[y+clears][x] = (*grid)[y][x];
+                (*grid)[y][x] = Piece_t::None;
+            }
         }
         if (clear)
             clears ++;
     }
-    int heightSum = 0;
-    int bumpiness = 0;
-    // calculate height sum, bumpiness
-    for (int i=0; i<10; i++) {
-        heightSum += heights[i];
-        if (i)
-            bumpiness += abs(heights[i] - heights[i-1]);
-    }
-    // height sum, bumpiness, clears, holes
-    int score = heightSum * (*weights)[0] + bumpiness * (*weights)[1] + clears * (*weights)[2] + holes * (*weights)[3];
+    gridInfo->clear = static_cast<Clear_t>(clears);
+}
+
+double Solver::evaluate (Grid *grid, GridInfo *gridInfo, Weights &weights) {
     
+    int maxHeight = -1;
+    int holes = 0;
+    int heights[10] = {0,0,0,0,0,0,0,0,0,0}; // first contact with filled
+    int wellValue = 0;
+    int wellDepth = 21;
+    int wellPos = -1;
+    int cellsCoveringHoles = 0;
+    int cellsCoveringHoles_sq = 0;
+    
+    // gets height && holes
+    for (int x=0; x<10; x++) {
+        for (int y=0; y<20; y++) {
+            // height
+            if ((*grid)[y][x] != Piece_t::None && heights[x] == 0)
+                heights[x] = 20 - y;
+            // holes
+            if (y > 0) {
+                if ((*grid)[y][x] == Piece_t::None && (*grid)[y-1][x] != Piece_t::None) {
+                    int cells = heights[x] - (20-y);
+                    cellsCoveringHoles += cells;
+                    cellsCoveringHoles_sq += cells * cells;
+                    holes++;
+                }
+            }
+        }
+        maxHeight = max(maxHeight, heights[x]);
+    }
+    // get well pos
+    for (int x=0; x<10; x++) {
+        if (wellDepth > heights[x]) {
+            wellDepth = heights[x];
+            wellPos = x;
+        }
+    }
+
+    // gets well value (how many lines it can clear)
+    for (int y=19-wellDepth; y>=0; y--) {
+        bool full = true;
+        for (int x=0; x<10; x++)
+            if (x != wellPos && (*grid)[y][x] == Piece_t::None)
+                full = false;
+        wellValue += full;
+        if (not full)
+            break;
+    }
+    wellValue = min(wellValue, 5);
+    
+    int totalDifference = 0;
+    int totalDifference_sq = 0;
+    int prev = 0;
+    for (int x=1; x<10; x++) {
+        if (x == wellPos) continue;
+        
+        int diff = abs(heights[x] - heights[prev]);
+        totalDifference += diff;
+        totalDifference_sq += diff * diff;
+        prev = x;
+    }
+
+    // TSPIN
+    int tspin_double_completion = 0;
+    
+    // For each variation, apply map to each 'x' at height[x]
+    for (int k=0; k<2; k++) {
+        const vector<int>& map = tsd_maps[k];
+        for (int x=0; x<10-2; x++) {
+            int y = heights[x] == 0 ?  17 : (19 - heights[x] - 1);
+            if (y < 0)
+                continue;
+            
+            int completion = 0;
+            bool possible = true;
+            
+            for (int i=0; i<3 && possible; i++) {
+                for (int j=0; j<3 && possible; j++) {
+                    if ( map[i*3 + j] && (*grid)[y + i][x + j] != Piece_t::None)  // if filled on right spot (+ points)
+                        completion ++;
+                    if (!map[i*3 + j] && (*grid)[y + i][x + j] != Piece_t::None)  // if filled when not supposed to (fail).
+                        possible = false;
+                }
+            }
+            if (possible)
+                tspin_double_completion = max(tspin_double_completion, completion);
+        }
+    }
+    
+    
+    double score = 0;
+    score += maxHeight * weights.height;
+    if (maxHeight >= 10) score += maxHeight * weights.height_H2;
+    if (maxHeight >= 15) score += maxHeight * weights.height_Q4;
+    score += holes * weights.holes;
+    switch (gridInfo->clear) {
+        case Clear_t::clear1:
+            score += weights.clear1;
+            break;
+        case Clear_t::clear2:
+            score += weights.clear2;
+            break;
+        case Clear_t::clear3:
+            score += weights.clear3;
+              break;
+        case Clear_t::clear4:
+            score += weights.clear4;
+            break;
+        case Clear_t::tspin_double:
+            score += weights.tspin_double;
+            break;
+        default:
+            break;
+    }
+    score += totalDifference * weights.bumpiness;
+    score += totalDifference_sq * weights.bumpiness_sq;
+    if (wellDepth == 0) score += wellValue * weights.max_well_depth + weights.well_placement[wellPos];
+    else  score += wellValue * weights.well_depth + weights.well_placement[wellPos];
+    score += cellsCoveringHoles * weights.hole_depth;
+    score += cellsCoveringHoles_sq * weights.hole_depth_sq;
+    
+    score += tspin_double_completion * tspin_double_completion * weights.tspin_completion_sq;
+    /*
+    score += gridInfo->b2b * weights.b2b_bonus;
+    score += gridInfo->combo * weights.combo;
+    score += gridInfo->b2bBreak * weights.b2b_break;
+     */
+
+#ifdef SOLVER_LOG
     Solver::printGrid(grid);
-    printf("Evaluated grid above, score:%d \n", score);
+    printf("Evaluated grid above, score:%lf \n", score);
+#endif
     return score;
 }
 
-Solver::Output Solver::solve(Solver::Input input) {
-    printf("Solver::solve called, piece: %d \n", input.piece);
-    printGrid(&input.grid);
+Grid* Solver::applySpin(Grid& ref, Piece_t piece, Pos pos, int r, int nr) {
+    // the kick table is generated under
+    // the assumption that y axis grows upwards
     
-    Output output = Solver::Output(0,0);
-    int best_score = -1e8;
-    int paths = 0;
+    if (piece == Piece_t::O || piece == Piece_t::I) return nullptr;
     
+    const Pos* offset1 = kick_table[int(piece)-1][r];
+    const Pos* offset2 = kick_table[int(piece)-1][nr];
+    
+    Pos kicks[5];
+    for (int i=0; i<5; i++) {
+        kicks[i] = Pos(
+            offset1[i].first - offset2[i].first,
+            offset1[i].second - offset2[i].second
+        );
+    }
+    const vector<int> map = piece_maps[int(piece)-1][nr];
+    int n = piece == Piece_t::I ? 5 : 3;
+    for (int k=0; k<5; k++) {
+        Pos npos = Pos(pos.first + kicks[k].first, pos.second - kicks[k].second);
+        bool clear = true;
+        for (int i=0; i<n; i++)
+            for (int j=0; j<n; j++)
+                if (map[i*n + j]) {
+                    if (npos.second + i < 0 || npos.second + i >= 20 || npos.first + j < 0 || npos.first + j >= 10) {
+                        clear = false;
+                        continue;
+                    }
+                    if (ref[npos.second + i][npos.first + j] != Piece_t::None)
+                        clear = false;
+                }
+            
+        if (clear) {
+            Grid* grid = new Grid(ref);
+            for (int i=0; i<n; i++)
+                for (int j=0; j<n; j++)
+                    if (map[i*n + j])
+                        (*grid)[npos.second + i][npos.first + j] = piece;
+            return grid;
+        }
+    }
+    return nullptr;
+}
+
+void Solver::findBestNode(Grid& ref, Piece_t piece, Weights& weights, Output** output, bool isHold) {
     for (int r=0; r<4; r++) {
         for (int x=0; x<10; x++) {
-            Grid* grid = Solver::place(input.grid, input.piece, x, r);
+            Grid* grid;
+            Pos pos;
+            tie(grid, pos) = Solver::place(ref, piece, x, r);
             if (grid == nullptr)
                 continue;
             
-            int score = Solver::evaluate(&weights, grid);
-            if (score > best_score) {
-                best_score = score;
-                output = Solver::Output(x,r);
-                output.grid = grid;
-            } else {
-                delete grid;
+            // NOTE: the pos values returned by 'place' is a coner pos, not center pos.
+            Grid* spin1 = Solver::applySpin(ref, piece, pos, r, (r+1)%4);
+            Grid* spin2 = Solver::applySpin(ref, piece, pos, r, (r+3)%4);
+            Grid* arr[] = {grid, spin1, spin2};
+
+            for (int i=0; i<3; i++) {
+                Grid* grid = arr[i];
+                if (grid == nullptr) continue;
+                GridInfo *gridInfo = new GridInfo();
+                Solver::checkClears(grid, gridInfo);
+                // TODO: check if TSPIN happened.
+                double score = Solver::evaluate(grid, gridInfo, weights);
+                if ((*output) == nullptr || score > (*output)->score) {
+                    *output = new Output(x,r,false);
+                    (*output)->grid = grid;
+                    (*output)->score = score;
+                    (*output)->gridInfo = gridInfo;
+                    if (i == 1) (*output)->spin =  1;
+                    if (i == 2) (*output)->spin = -1;
+                    if (isHold)
+                        (*output)->hold = true;
+                } else {
+                    delete grid;
+                }
             }
-            paths++;
         }
     }
-    printf("Solver done, after %d paths, produced output x:%d, r:%d \n", paths, output.x, output.r);
+}
+
+Output* Solver::solve(Input* input) {
+#ifdef SOLVER_LOG
+    printf("Solver::solve called, piece: %d \n", input->piece);
+    printGrid(&input->grid);
+#endif
+    Output *output = nullptr;
+
+    Solver::findBestNode(input->grid, input->piece, input->weights, &output);
+    if (input->hold != Piece_t::None)
+        Solver::findBestNode(input->grid, input->hold , input->weights, &output, true);
+    
+     if (output == nullptr) {
+        printf("No paths found, assuming game over\n");
+        return nullptr;
+    }
+    printf("Solver Got: piece:%s hold:%s\n", pieceName[(int)input->piece].c_str(), pieceName[(int)input->hold].c_str());
+    printGrid(output->grid);
+    printf("Solver done, produced output x:%d, r:%d, hold:%d, spin:%d for piece:%s \n",  output->x, output->r, output->hold, output->spin,
+           (output->hold ? pieceName[(int)input->hold] : pieceName[(int)input->piece]).c_str());
     return output;
 };
-std::string Solver::greet() {
-    return "Hello python from c++!";
-}

@@ -8,7 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		1C01FCB02857DFA400109DBF /* GameData.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1C01FCAF2857DFA400109DBF /* GameData.mm */; };
+		1C11861F2872BF1C0012EEA7 /* DataView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C11861E2872BF1C0012EEA7 /* DataView.swift */; };
 		1C2B667C28627D8200AD09B6 /* Maps.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1C2B667A28627D8200AD09B6 /* Maps.cpp */; };
+		1C4B0EA628667F2F007C8F62 /* libSolver.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1C4B0EA528667F2F007C8F62 /* libSolver.cpp */; };
 		1C9061D92831F26800ACD18F /* ImageHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C9061D82831F26800ACD18F /* ImageHelpers.swift */; };
 		1CA2AF92282CD84900718223 /* Bot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CA2AF91282CD84900718223 /* Bot.swift */; };
 		1CAED0AE28382AD40096855E /* Controller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CAED0AD28382AD40096855E /* Controller.swift */; };
@@ -25,8 +27,10 @@
 /* Begin PBXFileReference section */
 		1C01FCAE2857DF9C00109DBF /* GameData.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GameData.h; sourceTree = "<group>"; };
 		1C01FCAF2857DFA400109DBF /* GameData.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = GameData.mm; sourceTree = "<group>"; };
+		1C11861E2872BF1C0012EEA7 /* DataView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataView.swift; sourceTree = "<group>"; };
 		1C2B667A28627D8200AD09B6 /* Maps.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Maps.cpp; sourceTree = "<group>"; };
 		1C2B667B28627D8200AD09B6 /* Maps.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Maps.hpp; sourceTree = "<group>"; };
+		1C4B0EA528667F2F007C8F62 /* libSolver.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = libSolver.cpp; sourceTree = "<group>"; };
 		1C9061D82831F26800ACD18F /* ImageHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageHelpers.swift; sourceTree = "<group>"; };
 		1CA2AF91282CD84900718223 /* Bot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bot.swift; sourceTree = "<group>"; };
 		1CAED0AD28382AD40096855E /* Controller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Controller.swift; sourceTree = "<group>"; };
@@ -72,6 +76,7 @@
 		1CFDF2FD28612D5100BE4596 /* Solver */ = {
 			isa = PBXGroup;
 			children = (
+				1C4B0EA528667F2F007C8F62 /* libSolver.cpp */,
 				1CD31A182857FF0A00E68F78 /* Solver.hpp */,
 				1CD31A172857FF0A00E68F78 /* Solver.cpp */,
 				1C2B667B28627D8200AD09B6 /* Maps.hpp */,
@@ -102,6 +107,7 @@
 			children = (
 				1CE1201B28372322009DB2DC /* Views */,
 				1CA2AF91282CD84900718223 /* Bot.swift */,
+				1C11861E2872BF1C0012EEA7 /* DataView.swift */,
 				1CAED0B7283972580096855E /* FrameData.swift */,
 				1CAED0AD28382AD40096855E /* Controller.swift */,
 				1C01FCAE2857DF9C00109DBF /* GameData.h */,
@@ -190,6 +196,7 @@
 				1C01FCB02857DFA400109DBF /* GameData.mm in Sources */,
 				1C2B667C28627D8200AD09B6 /* Maps.cpp in Sources */,
 				1CD31A192857FF0A00E68F78 /* Solver.cpp in Sources */,
+				1C4B0EA628667F2F007C8F62 /* libSolver.cpp in Sources */,
 				1CAED0AE28382AD40096855E /* Controller.swift in Sources */,
 				C4B0DAC0276BA4B50015082A /* ScreenRecorder.swift in Sources */,
 				1CD31A1B2858002A00E68F78 /* SolverOutput.m in Sources */,
@@ -198,6 +205,7 @@
 				C4B0DABE276BA4B50015082A /* CaptureView.swift in Sources */,
 				1CA2AF92282CD84900718223 /* Bot.swift in Sources */,
 				1CE383C3283A9F1D00E74EB6 /* SolverDelegate.mm in Sources */,
+				1C11861F2872BF1C0012EEA7 /* DataView.swift in Sources */,
 				1CAED0B8283972590096855E /* FrameData.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -333,6 +341,10 @@
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (

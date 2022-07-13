@@ -9,6 +9,8 @@
 #ifndef SolverDelegate_h
 #define SolverDelegate_h
 
+#define SOLVER_LOG
+
 #import <Foundation/Foundation.h>
 #include "GameData.h"
 #include "SolverOutput.h"
