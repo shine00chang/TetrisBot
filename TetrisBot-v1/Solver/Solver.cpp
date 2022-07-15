@@ -54,11 +54,17 @@ Input::Input (int **g, int p, int h, double *w) {
         weights.bumpiness_sq = -w[11];
         weights.max_well_depth = w[12];
         weights.well_depth = w[13];
-        weights.tspin_double = w[14];
-        weights.tspin_completion_sq = w[15];
+        weights.tspin_single = w[14];
+        weights.tspin_double = w[15];
+        weights.tspin_triple = w[16];
+        weights.tspin_completion_sq = w[17];
     }
 };
-
+GridInfo::GridInfo (Piece_t _piece, Pos _pos, bool _spun) {
+    piece = _piece;
+    pos = _pos;
+    spun = _spun;
+};
 void Solver::printGrid(Grid* grid) {
     printf("\n");
     for (int y=0; y<20; y++) {
@@ -127,6 +133,26 @@ tuple<Grid*, Pos> Solver::place(Grid& ref, Piece_t piece, int i_x, int r) {
 }
 
 void Solver::checkClears(Grid* grid, GridInfo* gridInfo) {
+    // 3-Corner Check for tspins.
+    bool tspin = false;
+    if (gridInfo->spun && gridInfo->piece == Piece_t::T) {
+        int cnt = 0;
+        Pos &pos = gridInfo->pos;
+        
+        if (pos.first >= 0 && pos.second >= 0 && pos.first < 10 && pos.second < 20)
+            cnt += (*grid)[pos.second][pos.first] != Piece_t::None;
+        if (pos.first+2 >= 0 && pos.second >= 0 && pos.first+2 < 10 && pos.second < 20)
+            cnt += (*grid)[pos.second][pos.first +2] != Piece_t::None;
+        if (pos.first >= 0 && pos.second+2 >= 0 && pos.first < 10 && pos.second+2 < 20)
+            cnt += (*grid)[pos.second +2][pos.first] != Piece_t::None;
+        if (pos.first+2 >= 0 && pos.second+2 >= 0 && pos.first+2 < 10 && pos.second+2 < 20)
+            cnt += (*grid)[pos.second +2][pos.first +2] != Piece_t::None;
+
+        if (cnt >= 3)
+            tspin = true;
+    }
+    
+    // clear check
     int clears = 0;
     for (int y=19; y>=0; y--) {
         bool clear = true;
@@ -142,6 +168,19 @@ void Solver::checkClears(Grid* grid, GridInfo* gridInfo) {
             clears ++;
     }
     gridInfo->clear = static_cast<Clear_t>(clears);
+
+    if (tspin)
+        switch (clears) {
+            case 1:
+                gridInfo->clear = Clear_t::tspin_single;
+                break;
+            case 2:
+                gridInfo->clear = Clear_t::tspin_double;
+                break;
+            case 3:
+                gridInfo->clear = Clear_t::tspin_triple;
+                break;
+        }
 }
 
 double Solver::evaluate (Grid *grid, GridInfo *gridInfo, Weights &weights) {
@@ -208,27 +247,33 @@ double Solver::evaluate (Grid *grid, GridInfo *gridInfo, Weights &weights) {
     // TSPIN
     int tspin_double_completion = 0;
     
-    // For each variation, apply map to each 'x' at height[x]
+    // For each variation, apply map to each 'x' at height[x] & height[x] + 2
     for (int k=0; k<2; k++) {
         const vector<int>& map = tsd_maps[k];
-        for (int x=0; x<10-2; x++) {
-            int y = heights[x] == 0 ?  17 : (19 - heights[x] - 1);
-            if (y < 0)
-                continue;
-            
-            int completion = 0;
-            bool possible = true;
-            
-            for (int i=0; i<3 && possible; i++) {
-                for (int j=0; j<3 && possible; j++) {
-                    if ( map[i*3 + j] && (*grid)[y + i][x + j] != Piece_t::None)  // if filled on right spot (+ points)
-                        completion ++;
-                    if (!map[i*3 + j] && (*grid)[y + i][x + j] != Piece_t::None)  // if filled when not supposed to (fail).
-                        possible = false;
+        for (int l=0; l<2; l++) {
+            for (int x=0; x<10-2; x++) {
+                // because we need to apply it to both heightx & heightx +2 (because of overhang), some ugly numbers appear.
+                int y = min (17, (19 - heights[x] + (l? -1 : 1)));
+                if (y < 0)
+                    continue;
+                
+                int completion = 0;
+                bool possible = true;
+                
+                for (int i=0; i<3 && possible; i++) {
+                    for (int j=0; j<3 && possible; j++) {
+                        if ( map[i*3 + j] && (*grid)[y + i][x + j] != Piece_t::None)  // if filled on right spot (+ points)
+                            completion ++;
+                        if (!map[i*3 + j] && (*grid)[y + i][x + j] != Piece_t::None)  // if filled when not supposed to (fail).
+                            possible = false;
+                    }
                 }
+                // make sure the tspin is accessible.
+                // given that the spots that are supposed to be empty in the 3x3 are (provided by 'possible'), the heights
+                // just need to be less than or equal to 'y' to determine if it is accessible.
+                if (possible && heights[x] <= 20-y && heights[x+1] <= 20-y && heights[x+2] <= 20-y)
+                    tspin_double_completion = max(tspin_double_completion, completion);
             }
-            if (possible)
-                tspin_double_completion = max(tspin_double_completion, completion);
         }
     }
     
@@ -251,8 +296,14 @@ double Solver::evaluate (Grid *grid, GridInfo *gridInfo, Weights &weights) {
         case Clear_t::clear4:
             score += weights.clear4;
             break;
+        case Clear_t::tspin_single:
+             score += weights.tspin_single;
+            break;
         case Clear_t::tspin_double:
             score += weights.tspin_double;
+            break;
+        case Clear_t::tspin_triple:
+            score += weights.tspin_triple;
             break;
         default:
             break;
@@ -278,11 +329,11 @@ double Solver::evaluate (Grid *grid, GridInfo *gridInfo, Weights &weights) {
     return score;
 }
 
-Grid* Solver::applySpin(Grid& ref, Piece_t piece, Pos pos, int r, int nr) {
+std::tuple<Grid*, Pos> Solver::applySpin(Grid& ref, Piece_t piece, Pos pos, int r, int nr) {
     // the kick table is generated under
     // the assumption that y axis grows upwards
     
-    if (piece == Piece_t::O || piece == Piece_t::I) return nullptr;
+    if (piece == Piece_t::O || piece == Piece_t::I) return make_tuple(nullptr, Pos(0,0));;
     
     const Pos* offset1 = kick_table[int(piece)-1][r];
     const Pos* offset2 = kick_table[int(piece)-1][nr];
@@ -316,32 +367,32 @@ Grid* Solver::applySpin(Grid& ref, Piece_t piece, Pos pos, int r, int nr) {
                 for (int j=0; j<n; j++)
                     if (map[i*n + j])
                         (*grid)[npos.second + i][npos.first + j] = piece;
-            return grid;
+            return make_tuple(grid, npos);
         }
     }
-    return nullptr;
+    return make_tuple(nullptr, Pos(0,0));
 }
 
 void Solver::findBestNode(Grid& ref, Piece_t piece, Weights& weights, Output** output, bool isHold) {
     for (int r=0; r<4; r++) {
         for (int x=0; x<10; x++) {
-            Grid* grid;
-            Pos pos;
-            tie(grid, pos) = Solver::place(ref, piece, x, r);
-            if (grid == nullptr)
+            pair<Grid*, Pos> pathes[3];
+            pathes[0] = Solver::place(ref, piece, x, r);
+            if (pathes[0].first == nullptr)
                 continue;
             
             // NOTE: the pos values returned by 'place' is a coner pos, not center pos.
-            Grid* spin1 = Solver::applySpin(ref, piece, pos, r, (r+1)%4);
-            Grid* spin2 = Solver::applySpin(ref, piece, pos, r, (r+3)%4);
-            Grid* arr[] = {grid, spin1, spin2};
+            pathes[1] = Solver::applySpin(ref, piece, pathes[0].second, r, (r+1)%4);
+            pathes[2] = Solver::applySpin(ref, piece, pathes[0].second, r, (r+3)%4);
 
             for (int i=0; i<3; i++) {
-                Grid* grid = arr[i];
+                Grid* grid = pathes[i].first;
+                Pos pos = pathes[i].second;
+                
                 if (grid == nullptr) continue;
-                GridInfo *gridInfo = new GridInfo();
+                GridInfo *gridInfo = new GridInfo(piece, pos, i != 0 ? true : false);
                 Solver::checkClears(grid, gridInfo);
-                // TODO: check if TSPIN happened.
+
                 double score = Solver::evaluate(grid, gridInfo, weights);
                 if ((*output) == nullptr || score > (*output)->score) {
                     *output = new Output(x,r,false);
@@ -379,5 +430,8 @@ Output* Solver::solve(Input* input) {
     printGrid(output->grid);
     printf("Solver done, produced output x:%d, r:%d, hold:%d, spin:%d for piece:%s \n",  output->x, output->r, output->hold, output->spin,
            (output->hold ? pieceName[(int)input->hold] : pieceName[(int)input->piece]).c_str());
+    
+    if (output->gridInfo->clear == Clear_t::tspin_double)
+        printf("Did tspin double");
     return output;
 };

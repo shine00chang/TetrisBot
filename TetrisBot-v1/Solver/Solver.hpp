@@ -33,7 +33,9 @@ enum class Clear_t : int {
     clear2,
     clear3,
     clear4,
+    tspin_single,
     tspin_double,
+    tspin_triple,
 };
 
 typedef std::vector<std::vector<Piece_t>> Grid;
@@ -57,14 +59,20 @@ struct Weights {
     double combo = 150;
     double b2b_bonus = 52;
     double b2b_break = -100;
+    double tspin_single = -100;
     double tspin_double = 600;
+    double tspin_triple = 1000;
     double tspin_completion_sq = 50;
 };
 struct GridInfo {
+    GridInfo (Piece_t _piece, Pos _pos, bool _spun);
     Clear_t clear = Clear_t::None;
+    Piece_t piece = Piece_t::None;
+    Pos pos = Pos(0,0);
+    bool spun = false;
+    
     int wellpos = -1;
     int welldepth = 0;
-    std::pair<int,int> tspinCoord = std::pair<int,int>(-1,-1);
 };
 struct Input {
     Input (int **g, int p, int h, double *w = nullptr);
@@ -91,7 +99,7 @@ class Solver {
     static void checkClears (Grid* grid, GridInfo* gridInfo);
     static void processNode (Grid *grid, GridInfo *info, bool isRoot = false);
     static void findBestNode(Grid& ref, Piece_t piece, Weights& weights, Output** output, bool isHold = false);
-    static Grid* applySpin(Grid& ref, Piece_t Piece, Pos pos, int r, int nr);
+    static std::tuple<Grid*, Pos> applySpin(Grid& ref, Piece_t Piece, Pos pos, int r, int nr);
     
     static void printGrid (Grid* grid);
     

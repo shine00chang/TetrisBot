@@ -15,7 +15,7 @@
     @public int **grid;
     @public int piece;
     @public int hold;
-    @public double weights[14];
+    @public double weights[18];
 }
 -(id) init;
 -(void) setPiece: (const int) piece;

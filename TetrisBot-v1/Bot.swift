@@ -15,7 +15,7 @@ import SwiftUI
 let kGridPos = Position(x: 244, y: 432)
 let kGridSize = 48
 
-let kWeights = 16
+let kWeights = 18
 let kWeightLabels:[String] = [
     "height",
     "height_H2",
@@ -31,7 +31,9 @@ let kWeightLabels:[String] = [
     "bumpiness_sq",
     "max_well_depth",
     "well_depth",
+    "tspin_single",
     "tspin_double",
+    "tspin_triple",
     "tspin_completion_sq"
 ];
 let kWeightDefaults:[Double] = [
@@ -49,7 +51,9 @@ let kWeightDefaults:[Double] = [
     14,
     50,
     15,
+    -100,
     600,
+    100,
     50,
 ];
 
@@ -165,14 +169,15 @@ class Bot: ObservableObject {
                 }
             }
         }
+        /*
         print(" --- Bot.getGrid result:")
         if (gameData.newGrid == true) {
             print(" --- NEW: ---");
         }
-        printGrid(grid)
-        print(" --- ")
+        printGrid(grid);
+        print(" --- ");*/
          
-        return grid
+        return grid;
     }
     static func getPiece (from buffer: CVPixelBuffer) -> Piece {
         for y in 0...19 {
