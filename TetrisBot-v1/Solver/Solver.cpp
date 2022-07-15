@@ -29,7 +29,7 @@ const string pieceName [9] = {
 const Weights default_weights = Weights();
 
 
-Input::Input (int **g, int p, int h, double *w) {
+Input::Input (int **g, int p, int h, double *w, bool simple) {
     grid = Grid(20, vector<Piece_t>(10));
     for (int y=0; y<20; y++)
         for (int x=0; x<10; x++)
@@ -40,24 +40,45 @@ Input::Input (int **g, int p, int h, double *w) {
     if (w == nullptr)
         weights = default_weights;
     else {
-        weights.height = -w[0];
-        weights.height_H2 = -w[1];
-        weights.height_Q4 = -w[2];
-        weights.holes = -w[3];
-        weights.hole_depth = -w[4];
-        weights.hole_depth_sq = -w[5];
-        weights.clear1 = w[6];
-        weights.clear2 = w[7];
-        weights.clear3 = w[8];
-        weights.clear4 = w[9];
-        weights.bumpiness = -w[10];
-        weights.bumpiness_sq = -w[11];
-        weights.max_well_depth = w[12];
-        weights.well_depth = w[13];
-        weights.tspin_single = w[14];
-        weights.tspin_double = w[15];
-        weights.tspin_triple = w[16];
-        weights.tspin_completion_sq = w[17];
+        if (!simple) {
+            weights.height = -w[0];
+            weights.height_H2 = -w[1];
+            weights.height_Q4 = -w[2];
+            weights.holes = -w[3];
+            weights.hole_depth = -w[4];
+            weights.hole_depth_sq = -w[5];
+            weights.clear1 = w[6];
+            weights.clear2 = w[7];
+            weights.clear3 = w[8];
+            weights.clear4 = w[9];
+            weights.bumpiness = -w[10];
+            weights.bumpiness_sq = -w[11];
+            weights.max_well_depth = w[12];
+            weights.well_depth = w[13];
+            weights.tspin_single = w[14];
+            weights.tspin_double = w[15];
+            weights.tspin_triple = w[16];
+            weights.tspin_completion_sq = w[17];
+        } else {
+            weights.height = -w[0];
+            weights.height_H2 = 0;
+            weights.height_Q4 = 0;
+            weights.holes = -w[1];
+            weights.hole_depth = 0;
+            weights.hole_depth_sq = 0;
+            weights.clear1 = w[2];
+            weights.clear2 = w[2];
+            weights.clear3 = w[2];
+            weights.clear4 = w[2];
+            weights.bumpiness = -w[3];
+            weights.bumpiness_sq = 0;
+            weights.max_well_depth = 0;
+            weights.well_depth = 0;
+            weights.tspin_single = 0;
+            weights.tspin_double = 0;
+            weights.tspin_triple = 0;
+            weights.tspin_completion_sq = 0;
+        }
     }
 };
 GridInfo::GridInfo (Piece_t _piece, Pos _pos, bool _spun) {
@@ -236,8 +257,6 @@ double Solver::evaluate (Grid *grid, GridInfo *gridInfo, Weights &weights) {
     int totalDifference_sq = 0;
     int prev = 0;
     for (int x=1; x<10; x++) {
-        if (x == wellPos) continue;
-        
         int diff = abs(heights[x] - heights[prev]);
         totalDifference += diff;
         totalDifference_sq += diff * diff;
@@ -316,12 +335,37 @@ double Solver::evaluate (Grid *grid, GridInfo *gridInfo, Weights &weights) {
     score += cellsCoveringHoles_sq * weights.hole_depth_sq;
     
     score += tspin_double_completion * tspin_double_completion * weights.tspin_completion_sq;
+     
     /*
     score += gridInfo->b2b * weights.b2b_bonus;
     score += gridInfo->combo * weights.combo;
     score += gridInfo->b2bBreak * weights.b2b_break;
      */
+    /*
+    vector<int> heights (10,0);
+    int holes = 0;
 
+    // calculate heights, holes, and clears
+    for (int y=0; y<20; y++) {
+        for (int x=0; x<10; x++) {
+            if ((*grid)[y][x] != Piece_t::None && heights[x] == 0)
+                heights[x] = 20 - y;
+            if (y)
+                if ((*grid)[y][x] == Piece_t::None && (*grid)[y-1][x] != Piece_t::None)
+                    holes ++;
+        }
+    }
+    int heightSum = 0;
+    int bumpiness = 0;
+    // calculate height sum, bumpiness
+    for (int i=0; i<10; i++) {
+        heightSum += heights[i];
+        if (i)
+            bumpiness += abs(heights[i] - heights[i-1]);
+    }
+    // height sum, bumpiness, clears, holes
+     double score = heightSum * weights.height + bumpiness * weights.bumpiness + int(gridInfo->clear) * weights.clear1 + holes * weights.holes;
+     */
 #ifdef SOLVER_LOG
     Solver::printGrid(grid);
     printf("Evaluated grid above, score:%lf \n", score);
@@ -362,7 +406,19 @@ std::tuple<Grid*, Pos> Solver::applySpin(Grid& ref, Piece_t piece, Pos pos, int 
                 }
             
         if (clear) {
+            // shift it down to the lowest available coordinate
             Grid* grid = new Grid(ref);
+            bool clear = true;
+            int k = 0;
+            while (clear) {
+                k++;
+                for (int i=0; i<n; i++)
+                    for (int j=0; j<n; j++)
+                        if (map[i*n + j])
+                            if (npos.second + i + k > 19 || (*grid)[npos.second + i + k][npos.first + j] != Piece_t::None)
+                                clear = false;
+            }
+            npos.second += k-1;
             for (int i=0; i<n; i++)
                 for (int j=0; j<n; j++)
                     if (map[i*n + j])

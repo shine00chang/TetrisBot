@@ -132,7 +132,7 @@ for i in range(POPULATION_SIZE):
     magnitude = 0
     weights = agents[i]['weights']
     for j in range(WEIGHTS):
-        weights[j] = random.uniform(0, 1)
+        weights[j] = random.uniform(-1, 1)
         magnitude += weights[j] * weights[j]
     magnitude = math.sqrt(magnitude)
     for j in range(WEIGHTS):

@@ -75,7 +75,7 @@ struct GridInfo {
     int welldepth = 0;
 };
 struct Input {
-    Input (int **g, int p, int h, double *w = nullptr);
+    Input (int **g, int p, int h, double *w = nullptr, bool simple = false);
     Grid grid;
     Piece_t piece;
     Piece_t hold = Piece_t::None;
@@ -87,7 +87,7 @@ struct Output {
     int spin = 0;
     bool hold;
     Grid* grid = nullptr;
-    int score = 0;
+    double score = 0;
     GridInfo* gridInfo = nullptr;
 };
 

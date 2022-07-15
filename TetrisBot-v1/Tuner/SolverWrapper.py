@@ -1,6 +1,6 @@
 import ctypes
 
-from Setting import HEIGHT_BONUS, SURVIVAL_BONUS
+from Setting import SIMPLE, SURVIVAL_BONUS
 
 lib = ctypes.cdll.LoadLibrary('../Solver/libSolver.so')
 
@@ -30,27 +30,28 @@ class SolverWrapper(object):
         c_weights = (ctypes.c_double * weights.size)(*weights)
         ret_val = RetType()
         ret_val_ptr = ctypes.pointer(ret_val)
-        lib.solve(grid, piece, int(hold), c_weights, ret_val_ptr)
+        lib.solve(grid, piece, int(hold), c_weights, SIMPLE, ret_val_ptr)
 
         # Game Over
         if ret_val.over == 1:
             print("python: agent died")
             return True, False
+
+        #if ret_val.clears > 0:
+        #    agent['score'] += 20
+
         if ret_val.clears == 1:
-            agent['score'] += 40
+            agent['score'] += 20
         if ret_val.clears == 2:
-            agent['score'] += 100
+            agent['score'] += 50
         if ret_val.clears == 3:
             agent['score'] += 300
         if ret_val.clears == 4:
-            agent['score'] += 1200
+            agent['score'] += 1200  
 
-        height = 0
         for y in range(20):
             for x in range(10):
                 board[y][x] = grid[y * 10 + x]
-                if board[y][x] != 0:
-                    height = 20 - y
-        #agent['score'] += (20 - height) * HEIGHT_BONUS
+
         agent['score'] += SURVIVAL_BONUS
         return False, ret_val.hold

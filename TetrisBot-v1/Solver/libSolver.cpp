@@ -41,7 +41,7 @@ struct PyWeights {
 };
 
 extern "C" {
-    void solve(int *grid_in, int piece, int hold, double *weights, RetType *retVal) {
+    void solve(int *grid_in, int piece, int hold, double *weights,bool simple, RetType *retVal) {
         int **grid = new int*[20];
         for (int y=0; y<20; y++) {
             grid[y] = new int[10];
@@ -59,7 +59,7 @@ extern "C" {
         printf("created grid\n");
 #endif
         
-        Input input = Input(grid, piece, hold, weights);
+        Input input = Input(grid, piece, hold, weights, simple);
 #ifdef LIBSOLVER_LOG
         printf("created input:\n");
         printf("input.piece: %d\n", input.piece);

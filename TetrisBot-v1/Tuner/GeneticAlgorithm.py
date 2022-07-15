@@ -18,7 +18,7 @@ def crossOver(p1, p2):
 def GenerateDescendants(agents):
     descendants = np.zeros(math.floor(POPULATION_SIZE * 0.5), dtype=Agent_t)
     for i in range(descendants.size):
-        selected_agents = np.random.randint(0, POPULATION_SIZE, (math.floor(0.025 * POPULATION_SIZE)))
+        selected_agents = np.random.randint(0, POPULATION_SIZE, (math.floor(CROSSOVER_EXPLORATION_FACTOR * POPULATION_SIZE)))
         selected_agents = np.sort(selected_agents)
         descendants[i]['weights'] = crossOver(agents[selected_agents[0]], agents[selected_agents[1]])
 
