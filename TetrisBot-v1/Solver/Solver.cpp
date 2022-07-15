@@ -330,7 +330,7 @@ double Solver::evaluate (Grid *grid, GridInfo *gridInfo, Weights &weights) {
     score += totalDifference * weights.bumpiness;
     score += totalDifference_sq * weights.bumpiness_sq;
     if (wellDepth == 0) score += wellValue * weights.max_well_depth + weights.well_placement[wellPos];
-    else  score += wellValue * weights.well_depth + weights.well_placement[wellPos];
+    else  score += wellValue * weights.well_depth * weights.well_placement[wellPos];
     score += cellsCoveringHoles * weights.hole_depth;
     score += cellsCoveringHoles_sq * weights.hole_depth_sq;
     

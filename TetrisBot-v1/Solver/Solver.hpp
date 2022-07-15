@@ -41,27 +41,27 @@ enum class Clear_t : int {
 typedef std::vector<std::vector<Piece_t>> Grid;
 
 struct Weights {
-    double height = -30;
+    double height = 0;
     double height_H2 = -150;
     double height_Q4 = -511;
     double holes = -400;
     double hole_depth = -50;
-    double hole_depth_sq = 5;
+    double hole_depth_sq = 20;
     double clear1 = -230;
     double clear2 = -200;
     double clear3 = -160;
-    double clear4 = 400;
-    double bumpiness = -40;
-    double bumpiness_sq = -14;
-    double max_well_depth = 50;
-    double well_depth = 15;
-    double well_placement[10] = {20, -10, 0, 30, 15, 15, 30, 0, -15, 20};
+    double clear4 = 4000;
+    double bumpiness = -10;
+    double bumpiness_sq = -20;
+    double max_well_depth = 400;
+    double well_depth = 150;
+    double well_placement[10] = {2, -1, 0, 3, 1.5, 1.5, 3, 0, -1.5, 2};
     double combo = 150;
     double b2b_bonus = 52;
     double b2b_break = -100;
     double tspin_single = -100;
-    double tspin_double = 600;
-    double tspin_triple = 1000;
+    double tspin_double = 4000;
+    double tspin_triple = 10000;
     double tspin_completion_sq = 50;
 };
 struct GridInfo {

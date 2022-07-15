@@ -37,24 +37,24 @@ let kWeightLabels:[String] = [
     "tspin_completion_sq"
 ];
 let kWeightDefaults:[Double] = [
-    30,
+    0,
     150,
     511,
     400,
     50,
-    5,
+    20,
     -230,
     -200,
     -160,
+    4000,
+    10,
+    20,
     400,
-    40,
-    14,
-    50,
-    15,
+    150,
     -100,
     600,
     100,
-    50,
+    0,
 ];
 
 
@@ -91,13 +91,13 @@ func printGrid (_ grid:[[Piece]]) {
 class Bot: ObservableObject {
     
     @Published var weights: [String];
-    @Published var moveWaitTimeInput: String = "0.1";
+    @Published var moveWaitTimeInput: String = "0.15";
     
     @State var c_gameData: C_GameData = C_GameData();
     @Published var output: C_SolverOutput = C_SolverOutput(-1,r:-1, hold:false, spin:0);
     
-    @Published var waitTimeoutLimitInput = "0.2";
-    @Published var waitTimeoutLimit = 0.2;
+    @Published var waitTimeoutLimitInput = "0.5";
+    @Published var waitTimeoutLimit = 0.5;
     @Published var averageSolveTime: Double = 0.0
     
     @Published var errorMessage: String? = nil;
