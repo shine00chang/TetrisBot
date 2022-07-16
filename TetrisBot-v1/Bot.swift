@@ -1,5 +1,5 @@
 //
-//  ImageProcessor .swift
+//  Bot.swift
 //  CaptureSample
 //
 //  Created by Shine Chang on 5/11/22.
@@ -65,11 +65,15 @@ class GameData: ObservableObject {
     @Published var newGrid: Bool = false;
     @Published var over: Bool = false;
     @Published var blank: Bool = true;
+    @Published var previews: [Piece] = [];
     
     init () {
         for _ in 0..<20 {
-            let arr: [Piece] = [.None, .None, .None, .None, .None, .None, .None, .None, .None, .None]
-            grid.append(arr)
+            let arr: [Piece] = [.None, .None, .None, .None, .None, .None, .None, .None, .None, .None];
+            grid.append(arr);
+        }
+        for _ in 0..<5 {
+            previews.append(.None);
         }
     }
 }
@@ -210,29 +214,38 @@ class Bot: ObservableObject {
         if (piece != .None && piece != .Garbage) {
             return piece
         }
-        // Preview 1
-        // Preview 1 always has one block on 12, 1 or 12, 2.
-        pos = Position(x: kGridPos.x + kGridSize*13 + kGridSize/2,
-                       y: kGridPos.y + kGridSize    + kGridSize/2)
-        greyVal = Int(readPixelBuffer(for: buffer, at: pos))
-        piece = greyToPiece(greyVal);
-        if (piece != .None && piece != .Garbage) {
-            return piece
-        }
-        pos = Position(x: kGridPos.x + kGridSize*13 + kGridSize/2,
-                       y: kGridPos.y + kGridSize*2  + kGridSize/2)
-        greyVal = Int(readPixelBuffer(for: buffer, at: pos))
-        piece = greyToPiece(greyVal);
-        if (piece != .None && piece != .Garbage) {
-            return piece
-        }
         return .None;
     }
-    static func getGame (from buffer: CVPixelBuffer) {
-        gameData.grid = getGrid(from: buffer)
-        gameData.piece = getPiece(from: buffer)
-        gameData.hold = getHold(from: buffer)
+    static func getPreviews (from buffer: CVPixelBuffer) -> [Piece] {
+        var previews: [Piece] = [];
+        // Preview 1 always has one block on 12, 1 or 12, 2.
+        for i in 0..<5 {
+            var pos = Position(x: kGridPos.x + kGridSize*13        + kGridSize/2,
+                               y: kGridPos.y + kGridSize*(i*3 + 1) + kGridSize/2);
+            var greyVal = Int(readPixelBuffer(for: buffer, at: pos));
+            var piece = greyToPiece(greyVal);
+            if (piece != .None && piece != .Garbage) {
+                previews.append(piece);
+                continue;
+            }
+            pos = Position(x: kGridPos.x + kGridSize*13         + kGridSize/2,
+                           y: kGridPos.y + kGridSize*(i*3 + 2)  + kGridSize/2);
+            greyVal = Int(readPixelBuffer(for: buffer, at: pos));
+            piece = greyToPiece(greyVal);
+            if (piece != .None && piece != .Garbage) {
+                previews.append(piece);
+                continue;
+            }
+        }
+        return previews;
     }
+    static func getGame (from buffer: CVPixelBuffer) {
+        gameData.grid = getGrid(from: buffer);
+        gameData.piece = getPiece(from: buffer);
+        gameData.hold = getHold(from: buffer);
+        gameData.previews = getPreviews(from: buffer);
+    }
+    
     func checkRun () {
         // if game over
         if (gameData.over && !gameData.blank) {
@@ -364,7 +377,7 @@ class Bot: ObservableObject {
             }
         }
         c_gameData.setPiece(gameData.piece.rawValue);
-        c_gameData.setHold(gameData.hold.rawValue);
+        c_gameData.setHold(gameData.hold == .None ? gameData.previews[0].rawValue : gameData.hold.rawValue );
     }
     
 
