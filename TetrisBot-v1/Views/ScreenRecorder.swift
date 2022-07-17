@@ -222,8 +222,8 @@ extension ScreenRecorder: SCStreamOutput {
                                              contentScale: contentScale,
                                              scaleFactor: scaleFactor)
             if isValidGameFrame(self.frameData!) {
-                Bot.getGame(from: self.frameData!.pixelBuffer);
-                Bot.markGridPoints(for: self.frameData!.pixelBuffer)
+                getGame(from: self.frameData!.pixelBuffer);
+                markGridPoints(for: self.frameData!.pixelBuffer);
                 self.bot?.checkRun();
             }
             self.averageFrameDataExtractionTime += machTimeToSeconds( mach_absolute_time() - startTime );

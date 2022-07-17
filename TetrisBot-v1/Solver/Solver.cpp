@@ -17,8 +17,8 @@ using namespace std;
 
 const string pieceName [9] = {
     "None",
-    "L",
     "J",
+    "L",
     "S",
     "Z",
     "T",
