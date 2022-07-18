@@ -63,6 +63,7 @@ class GameData: ObservableObject {
     @Published var over: Bool = false;
     @Published var blank: Bool = true;
     @Published var previews: [Piece] = [];
+    @Published var first = false;
     
     init () {
         for _ in 0..<20 {
@@ -92,14 +93,14 @@ func printGrid (_ grid:[[Piece]]) {
 class Bot: ObservableObject {
     
     @Published var weights: [String];
-    @Published var moveWaitTimeInput: String = "0.1";
+    @Published var moveWaitTimeInput: String = "0.2";
     
     @State var c_gameData: C_GameData = C_GameData();
-    @Published var output: C_SolverOutput = C_SolverOutput(-1,r:-1, hold:false, spin:0);
     
     @Published var waitTimeoutLimitInput = "0.5";
     @Published var waitTimeoutLimit = 0.5;
-    @Published var averageSolveTime: Double = 0.0
+    @Published var frameWaitTimeInput = "0.1";
+    @Published var frameWaitTime = 0.1;
     
     @Published var errorMessage: String? = nil;
 
@@ -136,45 +137,36 @@ class Bot: ObservableObject {
                     gameData.newGrid = false;
                     return;
                 }
-                print("Time since last move: \(timeSinceLastMove)");
-                print("Published Task")
-                let delay : Double = max(0, moveWaitTime - timeSinceLastMove);
-                if (delay == 0) {
-                    runSolver();
-                } else {
-                    runSolver(moveAfter: delay);
+                Task {
+                    runSolver(time: moveNumber == 0 ? moveWaitTime : moveWaitTime - timeSinceLastMove, shouldMove: true);
                 }
-                moveNumber += 1;
-                
                 gameData.newGrid = false;
                 
             // if waited too long (most likely the last frame's output was not properly executed)
             } else if (timeSinceLastMove >= waitTimeoutLimit) {
                 print("waited too long, running solver now.");
-                runSolver();
-                moveNumber += 1;
+                runSolver(time: 0, shouldMove: true);
             }
         }
     }
     
-    func runSolver(moveAfter delayBeforeMove: Double = -1) {
-        let startTime = mach_absolute_time();
+    func runSolver(time: Double, shouldMove: Bool) {
         translateGameData();
-        output = SolverDelegate.runSolver(self.c_gameData);
-        let solveTime = machTimeToSeconds( mach_absolute_time() - startTime );
-        print("Swift received result, got x:\(output.getx()) r:\(output.getr()) hold:\(output.gethold()) spin:\(output.getspin()) after \(solveTime)");
-        self.lastMoveHadSpin = output.getspin() == 0 ? false : true;
         
-        if (delayBeforeMove == -1) {
-            PlacePiece(command: output);
-            lastMoveTime = mach_absolute_time();
-        } else {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delayBeforeMove) { [self] in
-                PlacePiece(command: output);
-                lastMoveTime = mach_absolute_time();
-            }
+        let output = SolverDelegate.runSolver(self.c_gameData, pTime: time, shouldMove: shouldMove, first: gameData.first);
+        gameData.first = false;
+        
+        if (!shouldMove) {
+            return;
         }
-        self.averageSolveTime = solveTime + self.averageSolveTime / 2.0;
+        if let output = output {
+            print("Swift received result, got x:\(output.getx()) r:\(output.getr()) hold:\(output.gethold()) spin:\(output.getspin())");
+            self.lastMoveHadSpin = output.getspin() == 0 ? false : true;
+            
+            PlacePiece(command: output);
+            moveNumber += 1;
+            lastMoveTime = mach_absolute_time();
+        }
     }
 
     func startPlay(moves: Int = 1) {
@@ -206,6 +198,7 @@ class Bot: ObservableObject {
             errorMessage = "INVALID TIMEOUT. NOT A DOUBLE: \(waitTimeoutLimitInput)";
             return;
         }
+        gameData.first = true;
     }
     func translateGameData() {
         for y in 0..<20 {
@@ -213,8 +206,11 @@ class Bot: ObservableObject {
                 c_gameData.setGrid(Int32(x), Int32(y), gameData.grid[y][x].rawValue);
             }
         }
-        c_gameData.setPiece(gameData.piece.rawValue);
-        c_gameData.setHold(gameData.hold == .None ? gameData.previews[0].rawValue : gameData.hold.rawValue );
+        c_gameData.setPieces(0, gameData.piece.rawValue);
+        for i in 0..<5 {
+            c_gameData.setPieces(Int32(i+1), gameData.previews[i].rawValue);
+        }
+        c_gameData.setHold( gameData.hold.rawValue );
     }
     
 

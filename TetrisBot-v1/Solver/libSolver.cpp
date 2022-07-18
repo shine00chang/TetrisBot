@@ -7,7 +7,7 @@
 //
 
 // TODO: adapt libSolver with the many updates in solver.
-
+/*
 #include <stdio.h>
 #include <stdlib.h>
 #include "Solver.hpp"
@@ -70,7 +70,7 @@ extern "C" {
             printf("\n");
         }
 #endif
-        Output *output = Solver::solve(&input);
+        Output *output = Solver::solve(&input, 0, false);
 #ifdef LIBSOLVER_LOG
         printf("Solver returned.\n");
 #endif
@@ -105,3 +105,4 @@ extern "C" {
         printf("%s", str);
     }
 }
+*/

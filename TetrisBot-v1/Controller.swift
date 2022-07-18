@@ -156,8 +156,8 @@ func PressKey (key: CGKeyCode, hold: Int = 500) {
 }
 func PressKeys (keys: [UInt16]) {
     for key in keys {
-        PressKey(key: key, hold: key == Keycode.downArrow ? 40000 : 500);
-        usleep(key == Keycode.downArrow ? 40000 : 500);
+        PressKey(key: key, hold: key == Keycode.downArrow ? 40000 : 1000);
+        usleep(key == Keycode.downArrow ? 40000 : 1000);
     }
 }
 

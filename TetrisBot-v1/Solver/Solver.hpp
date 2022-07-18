@@ -11,10 +11,9 @@
 
 #include <string>
 #include <vector>
+#include <list>
 
-typedef std::pair<int,int> Pos;
-
-const int kWeights = 16;
+extern const std::string pieceName [9];
 enum class Piece_t : int {
     None,
     J,
@@ -26,7 +25,6 @@ enum class Piece_t : int {
     O,
     Garbage
 };
-extern const std::string pieceName [9];
 enum class Clear_t : int {
     None,
     clear1,
@@ -38,8 +36,10 @@ enum class Clear_t : int {
     tspin_triple,
 };
 
+typedef std::pair<int,int> Pos;
 typedef std::vector<std::vector<Piece_t>> Grid;
 
+const int kWeights = 16;
 struct Weights {
     double height = 0;
     double height_H2 = -150;
@@ -64,21 +64,21 @@ struct Weights {
     double tspin_triple = 10000;
     double tspin_completion_sq = 50;
 };
+
 struct GridInfo {
     GridInfo (Piece_t _piece, Pos _pos, bool _spun);
     Clear_t clear = Clear_t::None;
     Piece_t piece = Piece_t::None;
     Pos pos = Pos(0,0);
     bool spun = false;
-    
+    double score = 0;
+
     int wellpos = -1;
     int welldepth = 0;
 };
 struct Input {
-    Input (int **g, int p, int h, double *w = nullptr, bool simple = false);
+    Input (int **g, double *w = nullptr, bool simple = false);
     Grid grid;
-    Piece_t piece;
-    Piece_t hold = Piece_t::None;
     Weights weights;
 };
 struct Output {
@@ -86,26 +86,39 @@ struct Output {
     int x, r;
     int spin = 0;
     bool hold;
-    Grid* grid = nullptr;
-    double score = 0;
-    GridInfo* gridInfo = nullptr;
+};
+struct Node {
+    std::list<Node*> children;
+    Node* parent;
+    bool explored = false;
+    
+    Grid* grid;
+    std::list<Piece_t>::iterator piece_it;
+    Piece_t hold = Piece_t::None;
+    GridInfo* gridInfo;
+    Output* output;
+    int layer = 0;
 };
 
-
 class Solver {
-
-    static std::tuple<Grid*, Pos> place (Grid &ref, Piece_t piece, int x, int r);
+    // --- Mechanics ---
     static double evaluate(Grid *grid, GridInfo* gridInfo, Weights &weights);
     static void checkClears (Grid* grid, GridInfo* gridInfo);
     static void processNode (Grid *grid, GridInfo *info, bool isRoot = false);
-    static void findBestNode(Grid& ref, Piece_t piece, Weights& weights, Output** output, bool isHold = false);
     static std::tuple<Grid*, Pos> applySpin(Grid& ref, Piece_t Piece, Pos pos, int r, int nr);
+    static std::tuple<Grid*, Pos> place (Grid &ref, Piece_t piece, int x, int r);
+
+    // --- Algo ---
+    static void Explore (Node* ref, Piece_t piece, Weights& weights, void (*treatment)(Node* child) = [](Node* child){return;});
+    static void clearTree (Node* node, Node* exception = nullptr);
     
+    // --- Helper ---
     static void printGrid (Grid* grid);
     
 public:
+    static Output* solve(Input *input, double pTime, bool returnOutput, bool first);
+    static void updatePieceStream (int* p, int h, bool first = false);
 
-    static Output* solve(Input *input);
     static int greet();
 };
 #endif /* Solver_hpp */

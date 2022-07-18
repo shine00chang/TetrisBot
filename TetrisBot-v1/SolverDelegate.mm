@@ -17,8 +17,7 @@
 #define SOLVER_LOG
 
 @implementation SolverDelegate
-+(C_SolverOutput*) runSolver: (C_GameData*) game {
-    
++(C_SolverOutput*) runSolver: (C_GameData*) game pTime:(double)pTime shouldMove:(bool)shouldMove first:(bool)first {
     // Prints grid on "game" variable
     for (int y=0; y<20; y++) {
         char str[20];
@@ -30,12 +29,16 @@
     }
 
     // protection
-    if (game->piece == 0 || game->piece == 8) {
+    if (game->pieces[0] == 0 || game->pieces[0] == 8) {
         printf("Invalid piece 0, returning failsafe move");
         return [[C_SolverOutput alloc] init: 4 r: 0 hold: false spin: 0];
     }
     
-    Output *output = Solver::solve(new Input(game->grid, game->piece, game->hold, game->weights));
+    Solver::updatePieceStream(game->pieces, game->hold, first);
+    Output *output = Solver::solve(new Input(game->grid, game->weights), pTime, shouldMove, first);
+    if (not shouldMove)
+        return nullptr;
+    
     if (output == nullptr) {
         printf("Received nullptr from Solver, returning failsafe move");
         return [[C_SolverOutput alloc] init: 4 r: 0 hold: false spin: 0];

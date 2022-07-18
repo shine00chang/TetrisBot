@@ -13,12 +13,12 @@
 
 @interface C_GameData: NSObject {
     @public int **grid;
-    @public int piece;
+    @public int *pieces;
     @public int hold;
     @public double weights[18];
 }
 -(id) init;
--(void) setPiece: (const int) piece;
+-(void) setPieces: (int)i :(const int) piece;
 -(void) setHold: (const int) piece;
 -(void) setGrid: (int)x :(int)y :(int) grid;
 -(void) setWeight: (int)i val:(double)val;

@@ -10,6 +10,7 @@
 #include "Maps.hpp"
 #include <vector>
 #include <list>
+#include <chrono>
 
 //#define SOLVER_LOG
 
@@ -28,15 +29,24 @@ const string pieceName [9] = {
 };
 const Weights default_weights = Weights();
 
+// --- Algo ---
+const int kCandidateSize = 10;
 
-Input::Input (int **g, int p, int h, double *w, bool simple) {
+Node* root;
+list<Node*> candidates;
+list<Piece_t> piece_stream;
+Piece_t rootHold;
+int new_pieces = 1;
+
+// --- Logging ---
+int nodes_processed = 0;
+
+Input::Input (int **g, double *w, bool simple) {
     grid = Grid(20, vector<Piece_t>(10));
     for (int y=0; y<20; y++)
         for (int x=0; x<10; x++)
             grid[y][x] = static_cast<Piece_t>( g[y][x] );
-    piece = static_cast<Piece_t>( p );
-    hold = static_cast<Piece_t>( h );
-    
+        
     if (w == nullptr)
         weights = default_weights;
     else {
@@ -336,36 +346,6 @@ double Solver::evaluate (Grid *grid, GridInfo *gridInfo, Weights &weights) {
     
     score += tspin_double_completion * tspin_double_completion * weights.tspin_completion_sq;
      
-    /*
-    score += gridInfo->b2b * weights.b2b_bonus;
-    score += gridInfo->combo * weights.combo;
-    score += gridInfo->b2bBreak * weights.b2b_break;
-     */
-    /*
-    vector<int> heights (10,0);
-    int holes = 0;
-
-    // calculate heights, holes, and clears
-    for (int y=0; y<20; y++) {
-        for (int x=0; x<10; x++) {
-            if ((*grid)[y][x] != Piece_t::None && heights[x] == 0)
-                heights[x] = 20 - y;
-            if (y)
-                if ((*grid)[y][x] == Piece_t::None && (*grid)[y-1][x] != Piece_t::None)
-                    holes ++;
-        }
-    }
-    int heightSum = 0;
-    int bumpiness = 0;
-    // calculate height sum, bumpiness
-    for (int i=0; i<10; i++) {
-        heightSum += heights[i];
-        if (i)
-            bumpiness += abs(heights[i] - heights[i-1]);
-    }
-    // height sum, bumpiness, clears, holes
-     double score = heightSum * weights.height + bumpiness * weights.bumpiness + int(gridInfo->clear) * weights.clear1 + holes * weights.holes;
-     */
 #ifdef SOLVER_LOG
     Solver::printGrid(grid);
     printf("Evaluated grid above, score:%lf \n", score);
@@ -429,65 +409,180 @@ std::tuple<Grid*, Pos> Solver::applySpin(Grid& ref, Piece_t piece, Pos pos, int 
     return make_tuple(nullptr, Pos(0,0));
 }
 
-void Solver::findBestNode(Grid& ref, Piece_t piece, Weights& weights, Output** output, bool isHold) {
+void Solver::Explore (Node* ref, Piece_t piece, Weights& weights, void (*treatment)(Node* child)) {
     for (int r=0; r<4; r++) {
         for (int x=0; x<10; x++) {
             pair<Grid*, Pos> pathes[3];
-            pathes[0] = Solver::place(ref, piece, x, r);
+            pathes[0] = Solver::place(*ref->grid, piece, x, r);
             if (pathes[0].first == nullptr)
                 continue;
             
             // NOTE: the pos values returned by 'place' is a coner pos, not center pos.
-            pathes[1] = Solver::applySpin(ref, piece, pathes[0].second, r, (r+1)%4);
-            pathes[2] = Solver::applySpin(ref, piece, pathes[0].second, r, (r+3)%4);
+            pathes[1] = Solver::applySpin(*ref->grid, piece, pathes[0].second, r, (r+1)%4);
+            pathes[2] = Solver::applySpin(*ref->grid, piece, pathes[0].second, r, (r+3)%4);
 
             for (int i=0; i<3; i++) {
                 Grid* grid = pathes[i].first;
                 Pos pos = pathes[i].second;
-                
                 if (grid == nullptr) continue;
+                
+                // --- Evaluate Child ---
                 GridInfo *gridInfo = new GridInfo(piece, pos, i != 0 ? true : false);
                 Solver::checkClears(grid, gridInfo);
-
-                double score = Solver::evaluate(grid, gridInfo, weights);
-                if ((*output) == nullptr || score > (*output)->score) {
-                    *output = new Output(x,r,false);
-                    (*output)->grid = grid;
-                    (*output)->score = score;
-                    (*output)->gridInfo = gridInfo;
-                    if (i == 1) (*output)->spin =  1;
-                    if (i == 2) (*output)->spin = -1;
-                    if (isHold)
-                        (*output)->hold = true;
+                gridInfo->score = Solver::evaluate(grid, gridInfo, weights);
+                // --- Create corresponding output for child ---
+                Output* output = new Output(x,r,false);
+                if (i == 1) output->spin =  1;
+                if (i == 2) output->spin = -1;
+                // --- Construct Child ---
+                Node* child = new Node();
+                child->parent = ref;
+                child->grid = grid;
+                child->gridInfo = gridInfo;
+                child->output = output;
+                child->piece_it = ref->piece_it; child->piece_it++;
+                child->hold = ref->hold;
+                child->layer = ref->layer +1;
+                treatment(child);
+                
+                // --- Manage Child ---
+                nodes_processed ++;
+                ref->children.push_back(child);
+                // --- Update candidates
+                if (candidates.size() < kCandidateSize) {
+                    candidates.push_back(child);
                 } else {
-                    delete grid;
+                    auto it = candidates.end(); it--;
+                    bool front = false;
+                    while ((*it)->gridInfo->score < child->gridInfo->score) {
+                        if (it == candidates.begin()) {
+                            front = true;
+                            break;
+                        }
+                        it --;
+                    }
+                    // if adding to front
+                    if (front) {
+                        candidates.push_front(child);
+                        candidates.pop_back();
+                        continue;
+                    }
+                    it ++;
+                    if (it != candidates.end()) {
+                        candidates.insert(it, child);
+                        candidates.pop_back();
+                    }
                 }
             }
         }
     }
 }
 
-Output* Solver::solve(Input* input) {
-#ifdef SOLVER_LOG
-    printf("Solver::solve called, piece: %d \n", input->piece);
-    printGrid(&input->grid);
-#endif
-    Output *output = nullptr;
+void Solver::clearTree(Node* node, Node* exception) {
+    for (Node* child : node->children)
+        if (child != exception)
+            clearTree(child);
+    delete node->grid;
+    delete node->gridInfo;
+    delete node->output;
+}
 
-    Solver::findBestNode(input->grid, input->piece, input->weights, &output);
-    if (input->hold != Piece_t::None)
-        Solver::findBestNode(input->grid, input->hold , input->weights, &output, true);
+Output* Solver::solve(Input* input, double pTime, bool returnOutput, bool first) {
+    nodes_processed = 0;
+    // if first move.
     
-     if (output == nullptr) {
-        printf("No paths found, assuming game over\n");
+    root = new Node();
+    root->grid = &input->grid;
+    root->piece_it = piece_stream.begin();
+    root->hold = rootHold;
+    root->gridInfo = new GridInfo(Piece_t::None, Pos(0,0), false);
+    candidates.clear();
+    
+    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+    do {
+        // select node
+        Node* node = nullptr;
+        if (!candidates.empty()) {
+            {
+                int node_i = arc4random_uniform((int) candidates.size());
+                auto node_it = candidates.begin();
+                for (int i=0; i<node_i; i++)
+                    node_it ++;
+                node = *node_it;
+            }
+        } else
+            node = root;
+        
+        Solver::Explore(node, *node->piece_it, input->weights);
+        if (node->hold != Piece_t::None)
+            Solver::Explore(node, node->hold, input->weights, [](Node* child){
+                child->output->hold = true;
+                child->hold = *child->parent->piece_it;
+            });
+        else {
+            auto piece_it = node->piece_it;
+            piece_it ++;
+            Solver::Explore(node, *piece_it, input->weights, [](Node* child) {
+                child->output->hold = true;
+                auto parent_piece_it = child->parent->piece_it;
+                child->hold = *parent_piece_it;
+                parent_piece_it ++; parent_piece_it ++;
+                child->piece_it = parent_piece_it;
+            });
+        }
+    } while (chrono::duration_cast<chrono::microseconds>(chrono::steady_clock::now() - begin).count()/1000000.0 < pTime);
+    if (returnOutput) {
+        // If game over
+        if (candidates.empty()) {
+            printf("game over");
+            return nullptr;
+        }
+            
+        // Find output's parent
+        Node* best = candidates.front();
+        while (best->parent != root)
+            best = best->parent;
+        Output* output = new Output(*best->output);
+        
+        printGrid(best->grid);
+        printf("parent hold: %s \n", pieceName[(int)root->hold].c_str());
+        printf("output hold: %s \n", pieceName[(int)best->hold].c_str());
+        for (auto it = root->piece_it; it != piece_stream.end(); it++) {
+            
+            printf("%s ", pieceName[(int)*it].c_str());
+            if (it == root->piece_it) printf("<- parent piece_it");
+            if (it == best->piece_it) printf("<- output piece_it");
+            
+            printf("\n");
+        }
+        printf("Solver done, produced output x:%d, r:%d, hold:%d, spin:%d after %d nodes processed \n",  output->x, output->r, output->hold, output->spin, nodes_processed);
+        
+        if (best->gridInfo->clear == Clear_t::tspin_double)
+            printf("Did tspin double");
+        
+        if (root->hold == Piece_t::None && output->hold) {
+            new_pieces = 2;
+            piece_stream.pop_front();
+        }
+        piece_stream.pop_front();
+        // --- Clear Tree ---
+        Solver::clearTree(root);
+        
+        return output;
+    } else
         return nullptr;
-    }
-    printf("Solver Got: piece:%s hold:%s\n", pieceName[(int)input->piece].c_str(), pieceName[(int)input->hold].c_str());
-    printGrid(output->grid);
-    printf("Solver done, produced output x:%d, r:%d, hold:%d, spin:%d for piece:%s \n",  output->x, output->r, output->hold, output->spin,
-           (output->hold ? pieceName[(int)input->hold] : pieceName[(int)input->piece]).c_str());
-    
-    if (output->gridInfo->clear == Clear_t::tspin_double)
-        printf("Did tspin double");
-    return output;
 };
+
+
+void Solver::updatePieceStream (int* p, int h, bool first) {
+    if (first) {
+        piece_stream.clear();
+        rootHold = Piece_t::None;
+        new_pieces = 6;
+    }
+    for (int i=0; i<new_pieces; i++)
+        piece_stream.push_back(static_cast<Piece_t>(p[6-new_pieces + i]));
+    new_pieces = 1;
+    
+    rootHold = static_cast<Piece_t>(h);
+}
