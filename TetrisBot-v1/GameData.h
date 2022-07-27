@@ -12,7 +12,7 @@
 #import <Foundation/Foundation.h>
 
 @interface C_GameData: NSObject {
-    @public int **grid;
+    @public int grid[20][10];
     @public int *pieces;
     @public int hold;
     @public double weights[18];

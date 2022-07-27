@@ -112,7 +112,7 @@ struct CaptureView: View {
                             bot.moveWaitTimeInput = filtered;
                         }
                  }
-                TextField("Piece per Second", text: $bot.waitTimeoutLimitInput)
+                TextField("Wait Timeout limit", text: $bot.waitTimeoutLimitInput)
                     .onReceive(Just(bot.waitTimeoutLimitInput)) { newValue in
                         let filtered = newValue.filter { "0123456789.".contains($0) }
                         if (filtered != bot.waitTimeoutLimitInput) {
@@ -133,25 +133,25 @@ struct CaptureView: View {
             Divider()
             // Image view
             if let frame = screenRecorder.frameData {
-                VStack {
-                    FrameDataView(frame: frame)
-                        .padding()
-                    Divider()
-                    DataView()
-                }
+        
+                DataView();
                 Divider()
                 
                 if let img = frame.image {
+                    VStack{
+                    FrameDataView(frame: frame)
+                        .padding()
+                    Divider();
                     Image(decorative: img, scale: 1.0)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
+                    }
                 }
             }
         }
         .padding()
         .onAppear {
-            timer = RunLoop.current.schedule(after: .init(.now),
-                                             interval: .seconds(3)) {
+            timer = RunLoop.current.schedule(after: .init(.now), interval: .seconds(3)) {
                 refreshAvailableContent()
             }
             screenRecorder.bot = self.bot;

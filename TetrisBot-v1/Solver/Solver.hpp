@@ -77,7 +77,7 @@ struct GridInfo {
     int welldepth = 0;
 };
 struct Input {
-    Input (int **g, double *w = nullptr, bool simple = false);
+    Input (int g[20][10], double *w = nullptr, bool simple = false);
     Grid grid;
     Weights weights;
 };
@@ -86,6 +86,7 @@ struct Output {
     int x, r;
     int spin = 0;
     bool hold;
+    Grid grid;
 };
 struct Node {
     std::list<Node*> children;

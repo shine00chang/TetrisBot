@@ -13,17 +13,11 @@
 -(id) init {
     self = [super init];
     if (self) {
-        self->grid = new int* [20];
-        for (int i=0; i<20; i++)
-            grid[i] = new int[10];
         self->pieces = new int[6];
         for (int i=0; i<6; i++)
             self->pieces[i] = 0;
     }
     return self;
-}
--(void) dealloc {
-    delete grid;
 }
 -(void) setGrid: (int)x :(int)y :(int) val {
     self->grid[y][x] = val;

@@ -33,19 +33,22 @@ const Weights default_weights = Weights();
 const int kCandidateSize = 10;
 
 Node* root;
+Node* best;
 list<Node*> candidates;
 list<Piece_t> piece_stream;
 Piece_t rootHold;
 int new_pieces = 1;
+int layer = 0;
 
 // --- Logging ---
 int nodes_processed = 0;
 
-Input::Input (int **g, double *w, bool simple) {
+Input::Input (int g[20][10], double *w, bool simple) {
     grid = Grid(20, vector<Piece_t>(10));
     for (int y=0; y<20; y++)
-        for (int x=0; x<10; x++)
-            grid[y][x] = static_cast<Piece_t>( g[y][x] );
+        for (int x=0; x<10; x++) 
+            grid  [y][x] = static_cast<Piece_t>( g[y][x] );
+        
         
     if (w == nullptr)
         weights = default_weights;
@@ -410,7 +413,11 @@ std::tuple<Grid*, Pos> Solver::applySpin(Grid& ref, Piece_t piece, Pos pos, int 
 }
 
 void Solver::Explore (Node* ref, Piece_t piece, Weights& weights, void (*treatment)(Node* child)) {
-    for (int r=0; r<4; r++) {
+    int rotations = 4;
+    if (piece == Piece_t::I) rotations = 2;
+    if (piece == Piece_t::O) rotations = 1;
+    
+    for (int r=0; r<rotations; r++) {
         for (int x=0; x<10; x++) {
             pair<Grid*, Pos> pathes[3];
             pathes[0] = Solver::place(*ref->grid, piece, x, r);
@@ -440,7 +447,7 @@ void Solver::Explore (Node* ref, Piece_t piece, Weights& weights, void (*treatme
                 child->grid = grid;
                 child->gridInfo = gridInfo;
                 child->output = output;
-                child->piece_it = ref->piece_it; child->piece_it++;
+                child->piece_it = next(ref->piece_it);
                 child->hold = ref->hold;
                 child->layer = ref->layer +1;
                 treatment(child);
@@ -448,30 +455,34 @@ void Solver::Explore (Node* ref, Piece_t piece, Weights& weights, void (*treatme
                 // --- Manage Child ---
                 nodes_processed ++;
                 ref->children.push_back(child);
-                // --- Update candidates
-                if (candidates.size() < kCandidateSize) {
+                // --- Update best ---
+                if (best == nullptr || child->gridInfo->score > best->gridInfo->score)
+                    best = child;
+                
+                // --- Update candidates ---
+                if (child->piece_it == prev(piece_stream.end()))
+                    continue;
+                if (candidates.empty())
                     candidates.push_back(child);
-                } else {
-                    auto it = candidates.end(); it--;
+                else {
+                    auto it = prev(candidates.end());
                     bool front = false;
                     while ((*it)->gridInfo->score < child->gridInfo->score) {
                         if (it == candidates.begin()) {
                             front = true;
                             break;
                         }
-                        it --;
+                        advance(it, -1);
                     }
                     // if adding to front
-                    if (front) {
+                    if (front)
                         candidates.push_front(child);
-                        candidates.pop_back();
-                        continue;
-                    }
-                    it ++;
-                    if (it != candidates.end()) {
+                    else {
+                        advance(it, 1);
                         candidates.insert(it, child);
-                        candidates.pop_back();
                     }
+                    if (candidates.size() > kCandidateSize)
+                        candidates.pop_back();
                 }
             }
         }
@@ -485,34 +496,35 @@ void Solver::clearTree(Node* node, Node* exception) {
     delete node->grid;
     delete node->gridInfo;
     delete node->output;
+    delete node;
 }
 
 Output* Solver::solve(Input* input, double pTime, bool returnOutput, bool first) {
     nodes_processed = 0;
-    // if first move.
+    printf("Solver Start\n");
     
-    root = new Node();
+    Node* root = new Node();
     root->grid = &input->grid;
     root->piece_it = piece_stream.begin();
     root->hold = rootHold;
     root->gridInfo = new GridInfo(Piece_t::None, Pos(0,0), false);
-    candidates.clear();
+    root->layer = ++layer;
     
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+    int explores = 0;
     do {
         // select node
         Node* node = nullptr;
         if (!candidates.empty()) {
-            {
-                int node_i = arc4random_uniform((int) candidates.size());
-                auto node_it = candidates.begin();
-                for (int i=0; i<node_i; i++)
-                    node_it ++;
-                node = *node_it;
-            }
+            int node_i = arc4random_uniform((int) candidates.size());
+            auto node_it = next(candidates.begin(), node_i);
+            node = *node_it;
+            candidates.erase(node_it);
         } else
             node = root;
         
+        if (node == root)
+            printf("explored root :thumbsup: \n");
         Solver::Explore(node, *node->piece_it, input->weights);
         if (node->hold != Piece_t::None)
             Solver::Explore(node, node->hold, input->weights, [](Node* child){
@@ -526,32 +538,36 @@ Output* Solver::solve(Input* input, double pTime, bool returnOutput, bool first)
                 child->output->hold = true;
                 auto parent_piece_it = child->parent->piece_it;
                 child->hold = *parent_piece_it;
-                parent_piece_it ++; parent_piece_it ++;
-                child->piece_it = parent_piece_it;
+                child->piece_it = next(parent_piece_it, 2);
             });
         }
+        explores ++;
     } while (chrono::duration_cast<chrono::microseconds>(chrono::steady_clock::now() - begin).count()/1000000.0 < pTime);
+    printf("Solver end, explores: %d \n", explores);
     if (returnOutput) {
         // If game over
-        if (candidates.empty()) {
-            printf("game over");
+        if (best == nullptr) {
+            printf("game over\n");
             return nullptr;
         }
-            
+        
         // Find output's parent
-        Node* best = candidates.front();
-        while (best->parent != root)
-            best = best->parent;
-        Output* output = new Output(*best->output);
+        Node* out = best;
+        while (out->parent != root)
+            out = out->parent;
+        Output* output = new Output(*out->output);
+        output->grid = *best->grid;
         
         printGrid(best->grid);
+        printf("\n");
+        printGrid(out->grid);
         printf("parent hold: %s \n", pieceName[(int)root->hold].c_str());
-        printf("output hold: %s \n", pieceName[(int)best->hold].c_str());
+        printf("output hold: %s \n", pieceName[(int)out->hold].c_str());
         for (auto it = root->piece_it; it != piece_stream.end(); it++) {
             
             printf("%s ", pieceName[(int)*it].c_str());
             if (it == root->piece_it) printf("<- parent piece_it");
-            if (it == best->piece_it) printf("<- output piece_it");
+            if (it == out->piece_it) printf("<- output piece_it");
             
             printf("\n");
         }
@@ -566,6 +582,8 @@ Output* Solver::solve(Input* input, double pTime, bool returnOutput, bool first)
         }
         piece_stream.pop_front();
         // --- Clear Tree ---
+        candidates.clear();
+        best = nullptr;
         Solver::clearTree(root);
         
         return output;

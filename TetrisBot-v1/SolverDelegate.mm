@@ -19,6 +19,7 @@
 @implementation SolverDelegate
 +(C_SolverOutput*) runSolver: (C_GameData*) game pTime:(double)pTime shouldMove:(bool)shouldMove first:(bool)first {
     // Prints grid on "game" variable
+    NSLog(@"Solver given board:");
     for (int y=0; y<20; y++) {
         char str[20];
         for (int x=0; x<10; x++) {
@@ -30,7 +31,7 @@
 
     // protection
     if (game->pieces[0] == 0 || game->pieces[0] == 8) {
-        printf("Invalid piece 0, returning failsafe move");
+        printf("Invalid piece 0, returning failsafe move\n");
         return [[C_SolverOutput alloc] init: 4 r: 0 hold: false spin: 0];
     }
     
@@ -38,12 +39,16 @@
     Output *output = Solver::solve(new Input(game->grid, game->weights), pTime, shouldMove, first);
     if (not shouldMove)
         return nullptr;
-    
     if (output == nullptr) {
-        printf("Received nullptr from Solver, returning failsafe move");
+        printf("Received nullptr from Solver, returning failsafe move\n");
         return [[C_SolverOutput alloc] init: 4 r: 0 hold: false spin: 0];
     }
-    return [[C_SolverOutput alloc] init: output->x r: output->r hold: output->hold spin: output->spin];
+    
+    C_SolverOutput* ret = [[C_SolverOutput alloc] init: output->x r: output->r hold: output->hold spin: output->spin];
+    for (int y=0; y<20; y++)
+        for (int x=0; x<10; x++)
+            [ret setGrid:x :y val:(int)output->grid[y][x]];
+    return ret;
 }
 
 @end

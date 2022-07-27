@@ -12,10 +12,12 @@
 @implementation C_SolverOutput : NSObject
 -(id) init: (int)x r:(int)r hold:(bool)hold spin:(int)spin{
     self = [super init];
-    self->x = x;
-    self->r = r;
-    self->spin = spin;
-    self->hold = hold;
+    if (self) {
+        self->x = x;
+        self->r = r;
+        self->spin = spin;
+        self->hold = hold;
+    }
     return self;
 }
 -(int) getx{
@@ -29,5 +31,12 @@
 }
 -(int) getspin {
     return self->spin;
+}
+-(int) getGrid: (int)x :(int)y {
+    return self->grid[y][x];
+}
+
+-(void) setGrid: (int)x :(int)y val:(int)v {
+    self->grid[y][x] = v;
 }
 @end

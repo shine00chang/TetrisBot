@@ -57,18 +57,21 @@ let kWeightDefaults:[Double] = [
 
 class GameData: ObservableObject {
     @Published var grid: [[Piece]] = [];
+    @Published var predictionGrid: [[Piece]] = [];
     @Published var piece: Piece = .None;
     @Published var hold: Piece = .None;
-    @Published var newGrid: Bool = false;
-    @Published var over: Bool = false;
-    @Published var blank: Bool = true;
     @Published var previews: [Piece] = [];
-    @Published var first = false;
+
+    var newGrid: Bool = false;
+    var over: Bool = false;
+    var blank: Bool = true;
+    var first = false;
     
     init () {
         for _ in 0..<20 {
             let arr: [Piece] = [.None, .None, .None, .None, .None, .None, .None, .None, .None, .None];
             grid.append(arr);
+            predictionGrid.append(arr);
         }
         for _ in 0..<5 {
             previews.append(.None);
@@ -109,6 +112,7 @@ class Bot: ObservableObject {
     var moveWaitTime: Double = 0;
     var movesRequested: Int = 0;
     var moveNumber: Int = 0;
+    var solving: Bool = false;
     
     init () {
         var weights: [String] = []
@@ -125,7 +129,7 @@ class Bot: ObservableObject {
             movesRequested = 0;
         }
         // if not over
-        if (moveNumber < movesRequested) {
+        if (moveNumber < movesRequested && !solving) {
             let timeSinceLastMove = machTimeToSeconds(mach_absolute_time() - lastMoveTime);
             
             // if new frame available
@@ -151,22 +155,34 @@ class Bot: ObservableObject {
     }
     
     func runSolver(time: Double, shouldMove: Bool) {
+        if (solving) {
+            print("!!!! --- ERROR: called solver when solving -----")
+            return;
+        }
         translateGameData();
+        self.solving = true;
         
         let output = SolverDelegate.runSolver(self.c_gameData, pTime: time, shouldMove: shouldMove, first: gameData.first);
         gameData.first = false;
         
-        if (!shouldMove) {
-            return;
+        if (shouldMove) {
+            if let output = output {
+                print("Swift received result, got x:\(output.getx()) r:\(output.getr()) hold:\(output.gethold()) spin:\(output.getspin())");
+                self.lastMoveHadSpin = output.getspin() == 0 ? false : true;
+                
+                DispatchQueue.main.async {
+                    for y in 0..<20 {
+                        for x in 0..<10 {
+                            gameData.predictionGrid[y][x] = Piece(rawValue: output.getGrid(Int32(x), Int32(y)))!;
+                        }
+                    }
+                }
+                PlacePiece(command: output);
+                moveNumber += 1;
+                lastMoveTime = mach_absolute_time();
+            }
         }
-        if let output = output {
-            print("Swift received result, got x:\(output.getx()) r:\(output.getr()) hold:\(output.gethold()) spin:\(output.getspin())");
-            self.lastMoveHadSpin = output.getspin() == 0 ? false : true;
-            
-            PlacePiece(command: output);
-            moveNumber += 1;
-            lastMoveTime = mach_absolute_time();
-        }
+        self.solving = false;
     }
 
     func startPlay(moves: Int = 1) {

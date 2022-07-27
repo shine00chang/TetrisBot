@@ -37,7 +37,7 @@
 		1CAED0B7283972580096855E /* FrameData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameData.swift; sourceTree = "<group>"; };
 		1CD31A172857FF0A00E68F78 /* Solver.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Solver.cpp; sourceTree = "<group>"; };
 		1CD31A182857FF0A00E68F78 /* Solver.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Solver.hpp; sourceTree = "<group>"; };
-		1CD31A1A2858002A00E68F78 /* SolverOutput.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SolverOutput.m; sourceTree = "<group>"; };
+		1CD31A1A2858002A00E68F78 /* SolverOutput.m */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.objcpp; path = SolverOutput.m; sourceTree = "<group>"; };
 		1CD31A1C2858003600E68F78 /* SolverOutput.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SolverOutput.h; sourceTree = "<group>"; };
 		1CE383C0283A9EC600E74EB6 /* SolverDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SolverDelegate.h; sourceTree = "<group>"; };
 		1CE383C1283A9F1C00E74EB6 /* TetrisBot-v1-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TetrisBot-v1-Bridging-Header.h"; sourceTree = "<group>"; };
