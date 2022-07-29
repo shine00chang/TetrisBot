@@ -37,7 +37,6 @@ Node* best;
 list<Node*> candidates;
 list<Piece_t> piece_stream;
 Piece_t rootHold;
-int new_pieces = 1;
 int layer = 0;
 
 // --- Logging ---
@@ -576,11 +575,10 @@ Output* Solver::solve(Input* input, double pTime, bool returnOutput, bool first)
         if (best->gridInfo->clear == Clear_t::tspin_double)
             printf("Did tspin double");
         
-        if (root->hold == Piece_t::None && output->hold) {
-            new_pieces = 2;
-            piece_stream.pop_front();
-        }
         piece_stream.pop_front();
+        if (root->hold == Piece_t::None && output->hold)
+            piece_stream.pop_front();
+    
         // --- Clear Tree ---
         candidates.clear();
         best = nullptr;
@@ -596,11 +594,14 @@ void Solver::updatePieceStream (int* p, int h, bool first) {
     if (first) {
         piece_stream.clear();
         rootHold = Piece_t::None;
-        new_pieces = 6;
     }
-    for (int i=0; i<new_pieces; i++)
-        piece_stream.push_back(static_cast<Piece_t>(p[6-new_pieces + i]));
-    new_pieces = 1;
-    
+    auto it = piece_stream.begin();
+    for (int i=0; i<6; i++) {
+        if (it != piece_stream.end()) {
+            (*it) = static_cast<Piece_t>(p[i]);
+            it ++;
+        } else
+            piece_stream.push_back(static_cast<Piece_t>(p[i]));
+    }
     rootHold = static_cast<Piece_t>(h);
 }
