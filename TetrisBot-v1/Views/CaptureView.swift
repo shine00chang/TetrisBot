@@ -13,6 +13,14 @@ import AppTrackingTransparency
 
 var gameData: GameData = GameData();
 
+func redirectLogToDocuments() {
+    let allPaths = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true);
+    let documentsDirectory = allPaths.first!
+    let pathStringComponent = "/log_file.txt";
+    let pathForLog = (documentsDirectory as NSString).appending(pathStringComponent);
+    freopen(pathForLog.cString(using: String.Encoding.ascii)!, "a+", stderr);
+}
+
 struct CaptureView: View {
 
     @StateObject var bot: Bot = Bot()
@@ -32,7 +40,7 @@ struct CaptureView: View {
             }
         }
     }
-
+    
     private let logger = Logger()
 
     var filteredWindows: [SCWindow]? {
@@ -42,6 +50,9 @@ struct CaptureView: View {
         .filter {
             $0.owningApplication != nil && $0.owningApplication?.applicationName != "" && $0.owningApplication?.applicationName != "Control Center"
         }
+    }
+    init () {
+        redirectLogToDocuments();
     }
     
     var body: some View {

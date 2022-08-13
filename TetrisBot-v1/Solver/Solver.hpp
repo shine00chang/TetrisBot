@@ -120,6 +120,6 @@ public:
     static Output* solve(Input *input, double pTime, bool returnOutput, bool first);
     static void updatePieceStream (int* p, int h, bool first = false);
 
-    static int greet();
+    static void initLogger();
 };
 #endif /* Solver_hpp */

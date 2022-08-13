@@ -15,7 +15,7 @@
 		1CA2AF92282CD84900718223 /* Bot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CA2AF91282CD84900718223 /* Bot.swift */; };
 		1CAED0AE28382AD40096855E /* Controller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CAED0AD28382AD40096855E /* Controller.swift */; };
 		1CAED0B8283972590096855E /* FrameData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CAED0B7283972580096855E /* FrameData.swift */; };
-		1CD31A192857FF0A00E68F78 /* Solver.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1CD31A172857FF0A00E68F78 /* Solver.cpp */; };
+		1CD31A192857FF0A00E68F78 /* Solver.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1CD31A172857FF0A00E68F78 /* Solver.mm */; };
 		1CD31A1B2858002A00E68F78 /* SolverOutput.m in Sources */ = {isa = PBXBuildFile; fileRef = 1CD31A1A2858002A00E68F78 /* SolverOutput.m */; };
 		1CE383C3283A9F1D00E74EB6 /* SolverDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1CE383C2283A9F1D00E74EB6 /* SolverDelegate.mm */; };
 		2291E512278E1711008CF77A /* FrameDataView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2291E511278E1711008CF77A /* FrameDataView.swift */; };
@@ -35,7 +35,7 @@
 		1CA2AF91282CD84900718223 /* Bot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bot.swift; sourceTree = "<group>"; };
 		1CAED0AD28382AD40096855E /* Controller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Controller.swift; sourceTree = "<group>"; };
 		1CAED0B7283972580096855E /* FrameData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameData.swift; sourceTree = "<group>"; };
-		1CD31A172857FF0A00E68F78 /* Solver.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Solver.cpp; sourceTree = "<group>"; };
+		1CD31A172857FF0A00E68F78 /* Solver.mm */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.objcpp; path = Solver.mm; sourceTree = "<group>"; };
 		1CD31A182857FF0A00E68F78 /* Solver.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Solver.hpp; sourceTree = "<group>"; };
 		1CD31A1A2858002A00E68F78 /* SolverOutput.m */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.objcpp; path = SolverOutput.m; sourceTree = "<group>"; };
 		1CD31A1C2858003600E68F78 /* SolverOutput.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SolverOutput.h; sourceTree = "<group>"; };
@@ -78,7 +78,7 @@
 			children = (
 				1C4B0EA528667F2F007C8F62 /* libSolver.cpp */,
 				1CD31A182857FF0A00E68F78 /* Solver.hpp */,
-				1CD31A172857FF0A00E68F78 /* Solver.cpp */,
+				1CD31A172857FF0A00E68F78 /* Solver.mm */,
 				1C2B667B28627D8200AD09B6 /* Maps.hpp */,
 				1C2B667A28627D8200AD09B6 /* Maps.cpp */,
 			);
@@ -195,7 +195,7 @@
 				1C9061D92831F26800ACD18F /* ImageHelpers.swift in Sources */,
 				1C01FCB02857DFA400109DBF /* GameData.mm in Sources */,
 				1C2B667C28627D8200AD09B6 /* Maps.cpp in Sources */,
-				1CD31A192857FF0A00E68F78 /* Solver.cpp in Sources */,
+				1CD31A192857FF0A00E68F78 /* Solver.mm in Sources */,
 				1C4B0EA628667F2F007C8F62 /* libSolver.cpp in Sources */,
 				1CAED0AE28382AD40096855E /* Controller.swift in Sources */,
 				C4B0DAC0276BA4B50015082A /* ScreenRecorder.swift in Sources */,

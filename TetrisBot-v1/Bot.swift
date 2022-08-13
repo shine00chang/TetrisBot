@@ -120,6 +120,7 @@ class Bot: ObservableObject {
             weights.append(String(format: "%f", weightDefault));
         }
         self.weights = weights;
+        SolverDelegate.initLogger();
     }
     
     func checkRun () {

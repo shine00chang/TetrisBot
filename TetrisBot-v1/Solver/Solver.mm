@@ -11,7 +11,10 @@
 #include <vector>
 #include <list>
 #include <chrono>
+#include <cstdio>
+#import <Foundation/Foundation.h>
 
+#define stdout_PATH "./Logs/log.txt"
 //#define SOLVER_LOG
 
 using namespace std;
@@ -40,7 +43,12 @@ Piece_t rootHold;
 int layer = 0;
 
 // --- Logging ---
+FILE* stdout;
 int nodes_processed = 0;
+
+void Solver::initLogger () {
+    //freopen ("myfile.txt","w",stdout);
+};
 
 Input::Input (int g[20][10], double *w, bool simple) {
     grid = Grid(20, vector<Piece_t>(10));
@@ -99,7 +107,7 @@ GridInfo::GridInfo (Piece_t _piece, Pos _pos, bool _spun) {
     spun = _spun;
 };
 void Solver::printGrid(Grid* grid) {
-    printf("\n");
+    NSLog(@"\n");
     for (int y=0; y<20; y++) {
         string str = "";
         for (int x=0; x<10; x++) {
@@ -107,7 +115,7 @@ void Solver::printGrid(Grid* grid) {
             str += ' ';
         }
         str += "\n";
-        printf("%s", str.c_str());
+        NSLog(@"%s", str.c_str());
     }
 }
 
@@ -350,7 +358,7 @@ double Solver::evaluate (Grid *grid, GridInfo *gridInfo, Weights &weights) {
      
 #ifdef SOLVER_LOG
     Solver::printGrid(grid);
-    printf("Evaluated grid above, score:%lf \n", score);
+    fNSLog(@stdout, "Evaluated grid above, score:%lf \n", score);
 #endif
     return score;
 }
@@ -500,7 +508,7 @@ void Solver::clearTree(Node* node, Node* exception) {
 
 Output* Solver::solve(Input* input, double pTime, bool returnOutput, bool first) {
     nodes_processed = 0;
-    printf("Solver Start\n");
+    NSLog(@"Solver Start\n");
     
     Node* root = new Node();
     root->grid = &input->grid;
@@ -523,7 +531,7 @@ Output* Solver::solve(Input* input, double pTime, bool returnOutput, bool first)
             node = root;
         
         if (node == root)
-            printf("explored root :thumbsup: \n");
+            NSLog(@"explored root :thumbsup: \n");
         Solver::Explore(node, *node->piece_it, input->weights);
         if (node->hold != Piece_t::None)
             Solver::Explore(node, node->hold, input->weights, [](Node* child){
@@ -542,11 +550,11 @@ Output* Solver::solve(Input* input, double pTime, bool returnOutput, bool first)
         }
         explores ++;
     } while (chrono::duration_cast<chrono::microseconds>(chrono::steady_clock::now() - begin).count()/1000000.0 < pTime);
-    printf("Solver end, explores: %d \n", explores);
+    NSLog(@"Solver end, explores: %d \n", explores);
     if (returnOutput) {
         // If game over
         if (best == nullptr) {
-            printf("game over\n");
+            NSLog(@"game over\n");
             return nullptr;
         }
         
@@ -558,22 +566,22 @@ Output* Solver::solve(Input* input, double pTime, bool returnOutput, bool first)
         output->grid = *best->grid;
         
         printGrid(best->grid);
-        printf("\n");
+        NSLog(@"\n");
         printGrid(out->grid);
-        printf("parent hold: %s \n", pieceName[(int)root->hold].c_str());
-        printf("output hold: %s \n", pieceName[(int)out->hold].c_str());
+        NSLog(@"parent hold: %s \n", pieceName[(int)root->hold].c_str());
+        NSLog(@"output hold: %s \n", pieceName[(int)out->hold].c_str());
         for (auto it = root->piece_it; it != piece_stream.end(); it++) {
             
-            printf("%s ", pieceName[(int)*it].c_str());
-            if (it == root->piece_it) printf("<- parent piece_it");
-            if (it == out->piece_it) printf("<- output piece_it");
+            NSLog(@"%s ", pieceName[(int)*it].c_str());
+            if (it == root->piece_it) NSLog(@"<- parent piece_it");
+            if (it == out->piece_it) NSLog(@"<- output piece_it");
             
-            printf("\n");
+            NSLog(@"\n");
         }
-        printf("Solver done, produced output x:%d, r:%d, hold:%d, spin:%d after %d nodes processed \n",  output->x, output->r, output->hold, output->spin, nodes_processed);
+        NSLog(@"Solver done, produced output x:%d, r:%d, hold:%d, spin:%d after %d nodes processed \n",  output->x, output->r, output->hold, output->spin, nodes_processed);
         
         if (best->gridInfo->clear == Clear_t::tspin_double)
-            printf("Did tspin double");
+            NSLog(@"Did tspin double");
         
         piece_stream.pop_front();
         if (root->hold == Piece_t::None && output->hold)
