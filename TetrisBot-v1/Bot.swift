@@ -43,7 +43,7 @@ let kWeightDefaults:[Double] = [
     -230,
     -200,
     -160,
-    4000,
+    10000,
     10,
     20,
     400,
@@ -120,7 +120,6 @@ class Bot: ObservableObject {
             weights.append(String(format: "%f", weightDefault));
         }
         self.weights = weights;
-        SolverDelegate.initLogger();
     }
     
     func checkRun () {
@@ -248,6 +247,7 @@ class Bot: ObservableObject {
                 Button("Run 120x") {
                     self.startPlay(moves: 120);
                 }
+                
             }
         }
     }

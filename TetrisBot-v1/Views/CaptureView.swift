@@ -14,11 +14,10 @@ import AppTrackingTransparency
 var gameData: GameData = GameData();
 
 func redirectLogToDocuments() {
-    let allPaths = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true);
-    let documentsDirectory = allPaths.first!
-    let pathStringComponent = "/log_file.txt";
-    let pathForLog = (documentsDirectory as NSString).appending(pathStringComponent);
-    freopen(pathForLog.cString(using: String.Encoding.ascii)!, "a+", stderr);
+    let path = "/Users/shinechang/Documents/CS/CS-dev/TetrisBot/Logs/log1.txt";
+    print("log_path: \(path)");
+    freopen(path, "w", stderr);
+    //freopen(path, "w", stdout);
 }
 
 struct CaptureView: View {

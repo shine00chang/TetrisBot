@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 #include <list>
-
+#include <set>
 extern const std::string pieceName [9];
 enum class Piece_t : int {
     None,
@@ -50,7 +50,7 @@ struct Weights {
     double clear1 = -230;
     double clear2 = -200;
     double clear3 = -160;
-    double clear4 = 4000;
+    double clear4 = 10000;
     double bumpiness = -10;
     double bumpiness_sq = -20;
     double max_well_depth = 400;
@@ -89,15 +89,19 @@ struct Output {
     Grid grid;
 };
 struct Node {
+    Node ();
+    ~Node ();
     std::list<Node*> children;
     Node* parent;
+    Node* best = nullptr;
+    long long id = 0;
     bool explored = false;
     
     Grid* grid;
     std::list<Piece_t>::iterator piece_it;
     Piece_t hold = Piece_t::None;
     GridInfo* gridInfo;
-    Output* output;
+    Output* output = nullptr;
     int layer = 0;
 };
 
@@ -115,11 +119,10 @@ class Solver {
     
     // --- Helper ---
     static void printGrid (Grid* grid);
-    
+    static void printNode (Node* node, std::string tags="");
+
 public:
     static Output* solve(Input *input, double pTime, bool returnOutput, bool first);
     static void updatePieceStream (int* p, int h, bool first = false);
-
-    static void initLogger();
 };
 #endif /* Solver_hpp */

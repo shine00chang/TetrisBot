@@ -17,9 +17,6 @@
 #define SOLVER_LOG
 
 @implementation SolverDelegate
-+(void) initLogger {
-    Solver::initLogger();
-}
 +(C_SolverOutput*) runSolver: (C_GameData*) game pTime:(double)pTime shouldMove:(bool)shouldMove first:(bool)first {
     // Prints grid on "game" variable
     NSLog(@"Solver given board:");

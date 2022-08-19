@@ -12,6 +12,8 @@
 #include <list>
 #include <chrono>
 #include <cstdio>
+#include <iostream>
+
 #import <Foundation/Foundation.h>
 
 #define stdout_PATH "./Logs/log.txt"
@@ -42,13 +44,25 @@ list<Piece_t> piece_stream;
 Piece_t rootHold;
 int layer = 0;
 
-// --- Logging ---
-FILE* stdout;
-int nodes_processed = 0;
+std::set<long long> NodeIdPool;
+long long NodeIdMax = 1;
 
-void Solver::initLogger () {
-    //freopen ("myfile.txt","w",stdout);
-};
+// --- Logging ---
+int nodes_processed = 0;
+double avg_explore_time = -1;
+const bool should_log_on_NSLog = true;
+const bool should_log = true;
+
+template<typename ... Args>
+void Log (const char* format, Args ... args) {
+    if (!should_log) return;
+    if (should_log_on_NSLog)
+        NSLog(@(format), args ...);
+    else {
+        const char* format_ = format + '\n';
+        printf(format, args ...);
+    }
+}
 
 Input::Input (int g[20][10], double *w, bool simple) {
     grid = Grid(20, vector<Piece_t>(10));
@@ -106,17 +120,34 @@ GridInfo::GridInfo (Piece_t _piece, Pos _pos, bool _spun) {
     pos = _pos;
     spun = _spun;
 };
+Node::Node() {
+    if (NodeIdPool.empty())
+        id = NodeIdMax ++;
+    else {
+        id = *NodeIdPool.begin();
+        NodeIdPool.erase(NodeIdPool.begin());
+    }
+};
+Node::~Node() {
+    NodeIdPool.insert(id);
+};
+
 void Solver::printGrid(Grid* grid) {
-    NSLog(@"\n");
     for (int y=0; y<20; y++) {
         string str = "";
         for (int x=0; x<10; x++) {
             str += (((*grid)[y][x] != Piece_t::None)? '0' + static_cast<int>((*grid)[y][x])-1 : '.');
             str += ' ';
         }
-        str += "\n";
-        NSLog(@"%s", str.c_str());
+        Log("LOG-%s", str.c_str());
     }
+}
+void Solver::printNode(Node* node, string tags) {
+    Log("LOG-node_start");
+    Log("LOG-tags%s", tags.c_str());
+    Log("LOG-id %lld", node->id);
+    printGrid(node->grid);
+    //printGridInfo(node->gridInfo);
 }
 
 void Solver::processNode(Grid *grid, GridInfo *info, bool isRoot) {
@@ -355,11 +386,8 @@ double Solver::evaluate (Grid *grid, GridInfo *gridInfo, Weights &weights) {
     score += cellsCoveringHoles_sq * weights.hole_depth_sq;
     
     score += tspin_double_completion * tspin_double_completion * weights.tspin_completion_sq;
-     
-#ifdef SOLVER_LOG
-    Solver::printGrid(grid);
-    fNSLog(@stdout, "Evaluated grid above, score:%lf \n", score);
-#endif
+
+    
     return score;
 }
 
@@ -462,10 +490,12 @@ void Solver::Explore (Node* ref, Piece_t piece, Weights& weights, void (*treatme
                 // --- Manage Child ---
                 nodes_processed ++;
                 ref->children.push_back(child);
+                if (ref->best == nullptr || ref->best->gridInfo->score < child->gridInfo->score)
+                    ref->best = child;
                 // --- Update best ---
                 if (best == nullptr || child->gridInfo->score > best->gridInfo->score)
                     best = child;
-                
+
                 // --- Update candidates ---
                 if (child->piece_it == prev(piece_stream.end()))
                     continue;
@@ -508,7 +538,7 @@ void Solver::clearTree(Node* node, Node* exception) {
 
 Output* Solver::solve(Input* input, double pTime, bool returnOutput, bool first) {
     nodes_processed = 0;
-    NSLog(@"Solver Start\n");
+    Log("LOG-solver_start %d", layer);
     
     Node* root = new Node();
     root->grid = &input->grid;
@@ -516,10 +546,15 @@ Output* Solver::solve(Input* input, double pTime, bool returnOutput, bool first)
     root->hold = rootHold;
     root->gridInfo = new GridInfo(Piece_t::None, Pos(0,0), false);
     root->layer = ++layer;
+    root->id = 0;
     
-    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+    // Print out root node for analyzer
+    printNode(root, " root");
+    
+    double time_elapsed = 0;
     int explores = 0;
     do {
+        std::chrono::steady_clock::time_point explore_start_time = std::chrono::steady_clock::now();
         // select node
         Node* node = nullptr;
         if (!candidates.empty()) {
@@ -529,9 +564,7 @@ Output* Solver::solve(Input* input, double pTime, bool returnOutput, bool first)
             candidates.erase(node_it);
         } else
             node = root;
-        
-        if (node == root)
-            NSLog(@"explored root :thumbsup: \n");
+    
         Solver::Explore(node, *node->piece_it, input->weights);
         if (node->hold != Piece_t::None)
             Solver::Explore(node, node->hold, input->weights, [](Node* child){
@@ -548,40 +581,58 @@ Output* Solver::solve(Input* input, double pTime, bool returnOutput, bool first)
                 child->piece_it = next(parent_piece_it, 2);
             });
         }
+        // Logging explored children
+        Log("LOG-children_of %lld %lu", node->id, node->children.size());
+        for(Node* child : node->children) {
+            string tags = "";
+            if (child == node->best)
+                tags += " best_child_tag";
+            printNode(child, tags);
+        }
         explores ++;
-    } while (chrono::duration_cast<chrono::microseconds>(chrono::steady_clock::now() - begin).count()/1000000.0 < pTime);
-    NSLog(@"Solver end, explores: %d \n", explores);
+        double explore_time = chrono::duration_cast<chrono::microseconds>(chrono::steady_clock::now() - explore_start_time).count() / 1000000.0;
+        time_elapsed += explore_time;
+        if (avg_explore_time == -1) avg_explore_time = explore_time;
+        avg_explore_time = (avg_explore_time + explore_time) / 2.0;
+        
+        printf("Explore time: %lf, average: %lf\n", explore_time, avg_explore_time);
+    } while (time_elapsed < pTime);
+    Log("LOG-solver_end explores %d processed %d", explores, nodes_processed);
+    printf("--- Explores: %d, processed: %d\n", explores, nodes_processed);
+    
+    
     if (returnOutput) {
         // If game over
         if (best == nullptr) {
-            NSLog(@"game over\n");
+            Log("LOG-Game_Over");
             return nullptr;
         }
         
         // Find output's parent
-        Node* out = best;
-        while (out->parent != root)
-            out = out->parent;
-        Output* output = new Output(*out->output);
+        Node* nextNode = best;
+        while (nextNode->parent != root)
+            nextNode = nextNode->parent;
+        Output* output = new Output(*nextNode->output);
         output->grid = *best->grid;
         
+        Log("LOG-best_future_grid");
         printGrid(best->grid);
-        NSLog(@"\n");
-        printGrid(out->grid);
-        NSLog(@"parent hold: %s \n", pieceName[(int)root->hold].c_str());
-        NSLog(@"output hold: %s \n", pieceName[(int)out->hold].c_str());
+        Log("LOG-best_move_grid");
+        printGrid(nextNode->grid);
+        Log("LOG-parent_hold: %s", pieceName[(int)root->hold].c_str());
+        Log("LOG-output_hold: %s", pieceName[(int)nextNode->hold].c_str());
         for (auto it = root->piece_it; it != piece_stream.end(); it++) {
             
-            NSLog(@"%s ", pieceName[(int)*it].c_str());
-            if (it == root->piece_it) NSLog(@"<- parent piece_it");
-            if (it == out->piece_it) NSLog(@"<- output piece_it");
+            Log("LOG-%s ", pieceName[(int)*it].c_str());
+            if (it == root->piece_it) Log("LOG-<- parent piece_it");
+            if (it == nextNode->piece_it)  Log("LOG-<- output piece_it");
             
-            NSLog(@"\n");
+            Log("LOG-");
         }
-        NSLog(@"Solver done, produced output x:%d, r:%d, hold:%d, spin:%d after %d nodes processed \n",  output->x, output->r, output->hold, output->spin, nodes_processed);
+        Log("LOG-Solver done, produced output x:%d, r:%d, hold:%d, spin:%d",  output->x, output->r, output->hold, output->spin);
         
         if (best->gridInfo->clear == Clear_t::tspin_double)
-            NSLog(@"Did tspin double");
+            Log("LOG-Did tspin double");
         
         piece_stream.pop_front();
         if (root->hold == Piece_t::None && output->hold)
@@ -590,6 +641,8 @@ Output* Solver::solve(Input* input, double pTime, bool returnOutput, bool first)
         // --- Clear Tree ---
         candidates.clear();
         best = nullptr;
+        NodeIdPool.clear();
+        NodeIdMax = 1;
         Solver::clearTree(root);
         
         return output;

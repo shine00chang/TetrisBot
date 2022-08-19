@@ -49,45 +49,45 @@ extern "C" {
                 grid[y][x] = grid_in[y*10 +x];
         }
 #ifdef LIBSOLVER_LOG
-        NSLog(@"Piece: %d", piece);
-        NSLog(@"Grid: \n");
+        Log("LOG-Piece: %d", piece);
+        Log("LOG-Grid: \n");
         for (int y=0; y<20; y++) {
             for (int x=0; x<10; x++)
-                NSLog(@"%d ", grid[y][x]);
-            NSLog(@"\n");
+                Log("LOG-%d ", grid[y][x]);
+            Log("LOG-\n");
         }
-        NSLog(@"created grid\n");
+        Log("LOG-created grid\n");
 #endif
         
         Input input = Input(grid, piece, hold, weights, simple);
 #ifdef LIBSOLVER_LOG
-        NSLog(@"created input:\n");
-        NSLog(@"input.piece: %d\n", input.piece);
-        NSLog(@"input.grid: \n");
+        Log("LOG-created input:\n");
+        Log("LOG-input.piece: %d\n", input.piece);
+        Log("LOG-input.grid: \n");
         for (int y=0; y<20; y++) {
             for (int x=0; x<10; x++)
-                NSLog(@"%d ", input.grid[y][x]);
-            NSLog(@"\n");
+                Log("LOG-%d ", input.grid[y][x]);
+            Log("LOG-\n");
         }
 #endif
         Output *output = Solver::solve(&input, 0, false);
 #ifdef LIBSOLVER_LOG
-        NSLog(@"Solver returned.\n");
+        Log("LOG-Solver returned.\n");
 #endif
         if (output == nullptr) {
-            NSLog(@"libSolver: received 'nullptr' from solver.\n");
+            Log("LOG-libSolver: received 'nullptr' from solver.\n");
             retVal->over = true;
         } else {
             for (int y=0; y<20; y++)
                 for (int x=0; x<10; x++)
                     grid_in[y*10 +x] = static_cast<int>((*output->grid)[y][x]);
 #ifdef LIBSOLVER_LOG
-            NSLog(@"output.gridInfo.clears: %d\n", output->gridInfo->clears);
-            NSLog(@"output.grid: \n");
+            Log("LOG-output.gridInfo.clears: %d\n", output->gridInfo->clears);
+            Log("LOG-output.grid: \n");
             for (int y=0; y<20; y++) {
                 for (int x=0; x<10; x++)
-                    NSLog(@"%d ", grid_in[y*10 +x]);
-                NSLog(@"\n");
+                    Log("LOG-%d ", grid_in[y*10 +x]);
+                Log("LOG-\n");
             }
 #endif
             retVal->clears = static_cast<int>(output->gridInfo->clear);
@@ -102,7 +102,7 @@ extern "C" {
         free(ptr);
     }
     void echo(char* str) {
-        NSLog(@"%s", str);
+        Log("LOG-%s", str);
     }
 }
 */

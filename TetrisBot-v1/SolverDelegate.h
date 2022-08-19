@@ -16,7 +16,6 @@
 #include "SolverOutput.h"
 
 @interface SolverDelegate : NSObject
-+(void) initLogger;
 +(C_SolverOutput*) runSolver: (C_GameData*) game pTime:(double)pTime shouldMove:(bool)shouldMove first:(bool)first; 
 @end
 
