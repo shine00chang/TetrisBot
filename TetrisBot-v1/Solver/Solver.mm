@@ -10,6 +10,7 @@
 #include "Maps.hpp"
 #include <vector>
 #include <list>
+#include <string.h>
 #include <chrono>
 #include <cstdio>
 #include <iostream>
@@ -50,20 +51,38 @@ long long NodeIdMax = 1;
 // --- Logging ---
 int nodes_processed = 0;
 double avg_explore_time = -1;
-const bool should_log_on_NSLog = true;
-const bool should_log = true;
+bool use_NSLog = true;
+bool should_log = false;
+
+void Solver::configLog(bool _should_log, bool _use_NSLog) {
+    should_log = _should_log;
+    use_NSLog = _use_NSLog;
+}
 
 template<typename ... Args>
 void Log (const char* format, Args ... args) {
     if (!should_log) return;
-    if (should_log_on_NSLog)
+    if (use_NSLog)
         NSLog(@(format), args ...);
     else {
-        const char* format_ = format + '\n';
-        printf(format, args ...);
+        char format_[sizeof(format) + 1] ;
+        strcpy(format_, format);
+        strcat(format_, "\n");
+        
+        printf(format_, args ...);
     }
 }
 
+template<typename ... Args>
+void LogBoth (const char* format, Args ... args) {
+    if (should_log)
+        NSLog(@(format), args ...);
+    char format_[strlen(format) + 1] ;
+    strcpy(format_, format);
+    strcat(format_, "\n");
+    
+    printf(format_, args ...);
+}
 Input::Input (int g[20][10], double *w, bool simple) {
     grid = Grid(20, vector<Piece_t>(10));
     for (int y=0; y<20; y++)
@@ -132,14 +151,17 @@ Node::~Node() {
     NodeIdPool.insert(id);
 };
 
-void Solver::printGrid(Grid* grid) {
+void Solver::printGrid(Grid* grid, bool both) {
     for (int y=0; y<20; y++) {
         string str = "";
         for (int x=0; x<10; x++) {
             str += (((*grid)[y][x] != Piece_t::None)? '0' + static_cast<int>((*grid)[y][x])-1 : '.');
             str += ' ';
         }
-        Log("LOG-%s", str.c_str());
+        if (both)
+            LogBoth("LOG-%s", str.c_str());
+        else
+            Log("LOG-%s", str.c_str());
     }
 }
 void Solver::printNode(Node* node, string tags) {
@@ -617,22 +639,20 @@ Output* Solver::solve(Input* input, double pTime, bool returnOutput, bool first)
         
         Log("LOG-best_future_grid");
         printGrid(best->grid);
-        Log("LOG-best_move_grid");
-        printGrid(nextNode->grid);
-        Log("LOG-parent_hold: %s", pieceName[(int)root->hold].c_str());
-        Log("LOG-output_hold: %s", pieceName[(int)nextNode->hold].c_str());
+        LogBoth("LOG-best_move_grid");
+        printGrid(nextNode->grid, true);
+        LogBoth("LOG-parent_hold: %s", pieceName[(int)root->hold].c_str());
+        LogBoth("LOG-output_hold: %s", pieceName[(int)nextNode->hold].c_str());
         for (auto it = root->piece_it; it != piece_stream.end(); it++) {
             
-            Log("LOG-%s ", pieceName[(int)*it].c_str());
-            if (it == root->piece_it) Log("LOG-<- parent piece_it");
-            if (it == nextNode->piece_it)  Log("LOG-<- output piece_it");
-            
-            Log("LOG-");
+            LogBoth("LOG-%s ", pieceName[(int)*it].c_str());
+            if (it == root->piece_it) LogBoth("LOG-<- parent piece_it");
+            if (it == nextNode->piece_it)  LogBoth("LOG-<- output piece_it");
         }
-        Log("LOG-Solver done, produced output x:%d, r:%d, hold:%d, spin:%d",  output->x, output->r, output->hold, output->spin);
+        LogBoth("LOG-Solver done, produced output x:%d, r:%d, hold:%d, spin:%d",  output->x, output->r, output->hold, output->spin);
         
         if (best->gridInfo->clear == Clear_t::tspin_double)
-            Log("LOG-Did tspin double");
+            LogBoth("LOG-Did tspin double");
         
         piece_stream.pop_front();
         if (root->hold == Piece_t::None && output->hold)

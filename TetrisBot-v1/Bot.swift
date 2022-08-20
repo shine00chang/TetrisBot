@@ -63,7 +63,7 @@ class GameData: ObservableObject {
     @Published var previews: [Piece] = [];
 
     var newGrid: Bool = false;
-    var over: Bool = false;
+    @Published var over: Bool = false;
     var blank: Bool = true;
     var first = false;
     
@@ -107,6 +107,11 @@ class Bot: ObservableObject {
     
     @Published var errorMessage: String? = nil;
 
+    @Published var should_log: Bool = true;
+    @Published var useNSLog: Bool = true;
+    
+    @State var testBool = false
+    
     var lastMoveHadSpin = false;
     var lastMoveTime: UInt64 = 0;
     var moveWaitTime: Double = 0;
@@ -186,10 +191,13 @@ class Bot: ObservableObject {
     }
 
     func startPlay(moves: Int = 1) {
+        // Initialize state variables
         self.movesRequested = moves;
         self.moveNumber = 0;
         self.lastMoveTime = mach_absolute_time();
-        
+        gameData.first = true;
+
+        // Set weights
         self.errorMessage = nil;
         print("weight -----")
         for i in 0..<kWeights {
@@ -201,6 +209,7 @@ class Bot: ObservableObject {
                 return;
             }
         }
+        // Set time-related configs
         if let moveWaitTime = Double(moveWaitTimeInput) {
             self.moveWaitTime = moveWaitTime;
         } else {
@@ -214,7 +223,8 @@ class Bot: ObservableObject {
             errorMessage = "INVALID TIMEOUT. NOT A DOUBLE: \(waitTimeoutLimitInput)";
             return;
         }
-        gameData.first = true;
+        // Set logger configs
+        SolverDelegate.configLog(self.should_log, useNSLog: self.useNSLog);
     }
     func translateGameData() {
         for y in 0..<20 {
@@ -232,6 +242,12 @@ class Bot: ObservableObject {
 
     var controlPannelView : some View {
         VStack {
+            Toggle("Tester", isOn: $testBool);
+            if (testBool) {
+                Text("test bool is on");
+            }
+                
+            
             Text("Solver Control Pannel: ")
                 .font(.subheadline)
             HStack (spacing: 10) {

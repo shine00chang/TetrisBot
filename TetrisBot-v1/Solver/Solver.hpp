@@ -118,11 +118,12 @@ class Solver {
     static void clearTree (Node* node, Node* exception = nullptr);
     
     // --- Helper ---
-    static void printGrid (Grid* grid);
+    static void printGrid (Grid* grid, bool both=false);
     static void printNode (Node* node, std::string tags="");
 
 public:
     static Output* solve(Input *input, double pTime, bool returnOutput, bool first);
     static void updatePieceStream (int* p, int h, bool first = false);
+    static void configLog(bool _should_log, bool _use_NSLog);
 };
 #endif /* Solver_hpp */

@@ -24,7 +24,7 @@ struct CaptureView: View {
 
     @StateObject var bot: Bot = Bot()
     @StateObject var screenRecorder: ScreenRecorder = ScreenRecorder()
-        
+            
     @State var availableContent: SCShareableContent?
     @State var targetWindow: SCWindow?
     @State var error: Error?
@@ -93,6 +93,13 @@ struct CaptureView: View {
                 Toggle("Show Gray Scale", isOn: $grayScale)
                     .toggleStyle(SwitchToggleStyle())
                 Text("Average Frame Data Extraction Time: \(self.screenRecorder.averageFrameDataExtractionTime)")
+                // Logger Control
+                HStack {
+                    Toggle("Should Log", isOn: $bot.should_log)
+                        .toggleStyle(SwitchToggleStyle());
+                    Toggle("use NSLog", isOn: $bot.useNSLog)
+                        .toggleStyle(SwitchToggleStyle());
+                }
                 bot.controlPannelView
             }
             Divider()
@@ -115,6 +122,7 @@ struct CaptureView: View {
                     Text(errorMessage)
                         .foregroundColor(.red);
                 }
+                // Speed Control
                 TextField("Piece per Second", text: $bot.moveWaitTimeInput)
                     .onReceive(Just(bot.moveWaitTimeInput)) { newValue in
                         let filtered = newValue.filter { "0123456789.".contains($0) }
@@ -139,6 +147,7 @@ struct CaptureView: View {
                     }
                     Divider();
                 }
+
             }
             Divider()
             // Image view

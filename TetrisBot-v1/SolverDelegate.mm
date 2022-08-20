@@ -51,4 +51,7 @@
     return ret;
 }
 
++(void) configLog:(bool)should_log useNSLog:(bool)useNSLog {
+    Solver::configLog(should_log, useNSLog);
+}
 @end

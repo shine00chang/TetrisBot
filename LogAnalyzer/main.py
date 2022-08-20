@@ -6,7 +6,7 @@ from Settings import *
 
 # Construct tk window
 root = tk.Tk()
-window = tk.Frame(root, width=400, height=800)
+window = tk.Frame(root, width=600, height=800)
 window.pack(expand=True, fill=tk.BOTH)
 
 # Control panel construction. The panel is for controlling the program prior to loading.
@@ -190,6 +190,15 @@ while True:
             # Add to database
             nodes[node.id] = node
             nodes[parent_id].children.append(node.id)
+
+print("Sorting children for each parent...")
+# Sort children
+for node_id, node in nodes.items():
+
+    def getChildrenLength(child_id):
+        return len(nodes[child_id].children)
+
+    node.children.sort(reverse=True, key=getChildrenLength)
 
 
 print("Finished reading, found {} explores".format(explore_sets))
