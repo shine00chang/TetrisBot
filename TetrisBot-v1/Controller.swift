@@ -133,7 +133,7 @@ struct Keycode {
     static let keypad9                   : UInt16 = 0x5C
 }
 
-func PressKey (key: CGKeyCode, hold: Int = 500) {
+func PressKey (key: CGKeyCode, hold: Int = 100) {
     print("Bot did press key:\(key)");
     let keyDown = CGEvent(
         keyboardEventSource: nil,
@@ -156,8 +156,8 @@ func PressKey (key: CGKeyCode, hold: Int = 500) {
 }
 func PressKeys (keys: [UInt16]) {
     for key in keys {
-        PressKey(key: key, hold: key == Keycode.downArrow ? 40000 : 1000);
-        usleep(key == Keycode.downArrow ? 40000 : 1000);
+        PressKey(key: key, hold: key == Keycode.downArrow ? 40000 : 100);
+        usleep(key == Keycode.downArrow ? 40000 : 100);
     }
 }
 

@@ -36,7 +36,7 @@ const string pieceName [9] = {
 const Weights default_weights = Weights();
 
 // --- Algo ---
-const int kCandidateSize = 10;
+const int kCandidateSize = 30;
 
 Node* root;
 Node* best;
@@ -51,7 +51,7 @@ long long NodeIdMax = 1;
 // --- Logging ---
 int nodes_processed = 0;
 double avg_explore_time = -1;
-bool use_NSLog = true;
+bool use_NSLog = false;
 bool should_log = false;
 
 void Solver::configLog(bool _should_log, bool _use_NSLog) {
@@ -638,9 +638,9 @@ Output* Solver::solve(Input* input, double pTime, bool returnOutput, bool first)
         output->grid = *best->grid;
         
         Log("LOG-best_future_grid");
-        printGrid(best->grid);
+        printGrid(best->grid, true);
         LogBoth("LOG-best_move_grid");
-        printGrid(nextNode->grid, true);
+        printGrid(nextNode->grid);
         LogBoth("LOG-parent_hold: %s", pieceName[(int)root->hold].c_str());
         LogBoth("LOG-output_hold: %s", pieceName[(int)nextNode->hold].c_str());
         for (auto it = root->piece_it; it != piece_stream.end(); it++) {
