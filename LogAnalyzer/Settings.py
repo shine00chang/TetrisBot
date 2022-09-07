@@ -18,4 +18,5 @@ class Node:
         self.canvas = 0
         self.frame_constructed = False
         self.info_text = 0
+        self.stats = {}
 

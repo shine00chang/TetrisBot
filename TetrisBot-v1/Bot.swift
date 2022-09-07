@@ -8,7 +8,6 @@
 
 import Foundation
 import ScreenCaptureKit
-import OSLog
 import VideoToolbox
 import SwiftUI
 
@@ -37,15 +36,15 @@ let kWeightDefaults:[Double] = [
     0,
     15,
     50,
-    50,
-    10,
-    2,
+    70,
+    15,
+    4,
     -200,
     -200,
     -200,
     10000,
+    2,
     4,
-    8,
     60,
     20,
     0,
@@ -197,6 +196,9 @@ class Bot: ObservableObject {
         self.lastMoveTime = mach_absolute_time();
         gameData.first = true;
 
+        // Clear log file
+        SolverDelegate.resetSolver();
+        
         // Set weights
         self.errorMessage = nil;
         print("weight -----")
@@ -242,11 +244,6 @@ class Bot: ObservableObject {
 
     var controlPannelView : some View {
         VStack {
-            Toggle("Tester", isOn: $testBool);
-            if (testBool) {
-                Text("test bool is on");
-            }
-                
             
             Text("Solver Control Pannel: ")
                 .font(.subheadline)

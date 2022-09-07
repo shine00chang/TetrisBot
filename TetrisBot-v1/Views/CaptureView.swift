@@ -14,10 +14,12 @@ import AppTrackingTransparency
 var gameData: GameData = GameData();
 
 func redirectLogToDocuments() {
+    /*
     let path = "/Users/shinechang/Documents/CS/CS-dev/TetrisBot/Logs/log1.txt";
     print("log_path: \(path)");
-    freopen(path, "w", stderr);
-    //freopen(path, "w", stdout);
+    freopen(path, "w", stderr); // NSLOG
+    //freopen(path, "w", stdout); // (c++) printf & (swift) print
+     */
 }
 
 struct CaptureView: View {

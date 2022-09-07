@@ -11,14 +11,15 @@
 #include <vector>
 #include <list>
 #include <string.h>
+#include <string>
 #include <chrono>
 #include <cstdio>
 #include <iostream>
+#include <fstream>
+#include <stdio.h>
 
 #import <Foundation/Foundation.h>
 
-#define stdout_PATH "./Logs/log.txt"
-//#define SOLVER_LOG
 
 using namespace std;
 
@@ -49,6 +50,10 @@ std::set<long long> NodeIdPool;
 long long NodeIdMax = 1;
 
 // --- Logging ---
+const char* path = "/Users/shinechang/Documents/CS/CS-dev/TetrisBot/Logs/log1.txt";
+fstream fs(path, fstream::out);
+const int kLogBufferSize = 1000;
+char logBuffer[kLogBufferSize * 2];
 int nodes_processed = 0;
 double avg_explore_time = -1;
 bool use_NSLog = false;
@@ -59,30 +64,44 @@ void Solver::configLog(bool _should_log, bool _use_NSLog) {
     use_NSLog = _use_NSLog;
 }
 
+void Solver::resetSolver() {
+    fs.close();
+    layer = 0;
+    memset(logBuffer, 0, sizeof(logBuffer));
+    fs.open(path, fstream::out | fstream::trunc);
+}
+
 template<typename ... Args>
 void Log (const char* format, Args ... args) {
     if (!should_log) return;
-    if (use_NSLog)
-        NSLog(@(format), args ...);
-    else {
-        char format_[sizeof(format) + 1] ;
-        strcpy(format_, format);
-        strcat(format_, "\n");
         
-        printf(format_, args ...);
+    if (strlen(logBuffer) + strlen(format) > kLogBufferSize) {
+        fs << logBuffer;
+        memset(logBuffer, 0, sizeof(logBuffer));
     }
+    sprintf(logBuffer + strlen(logBuffer), format, args...);
+    return;
 }
 
 template<typename ... Args>
 void LogBoth (const char* format, Args ... args) {
-    if (should_log)
-        NSLog(@(format), args ...);
-    char format_[strlen(format) + 1] ;
-    strcpy(format_, format);
-    strcat(format_, "\n");
+    if (!should_log) return;
     
-    printf(format_, args ...);
+    Log(format, args...);
+    
+    char fmt[strlen(format)];
+    strcpy(fmt, format);
+    if (fmt[strlen(fmt)-1] == '\n')
+        fmt[strlen(fmt)-1] = ' ';
+    NSLog(@(format), args...);
 }
+
+void emptyLogBuffer () {
+    fs << logBuffer;
+    memset(logBuffer, 0, sizeof(logBuffer));
+}
+
+
 Input::Input (int g[20][10], double *w, bool simple) {
     grid = Grid(20, vector<Piece_t>(10));
     for (int y=0; y<20; y++)
@@ -140,12 +159,12 @@ GridInfo::GridInfo (Piece_t _piece, Pos _pos, bool _spun) {
     spun = _spun;
 };
 Node::Node() {
-    if (NodeIdPool.empty())
+    //if (NodeIdPool.empty())
         id = NodeIdMax ++;
-    else {
+    /*else {
         id = *NodeIdPool.begin();
         NodeIdPool.erase(NodeIdPool.begin());
-    }
+    }*/
 };
 Node::~Node() {
     NodeIdPool.insert(id);
@@ -159,26 +178,33 @@ void Solver::printGrid(Grid* grid, bool both) {
             str += ' ';
         }
         if (both)
-            LogBoth("LOG-%s", str.c_str());
+            LogBoth("LOG-%s\n", str.c_str());
         else
-            Log("LOG-%s", str.c_str());
+            Log("LOG-%s\n", str.c_str());
     }
 }
 void Solver::printNode(Node* node, string tags) {
-    Log("LOG-node_start");
-    Log("LOG-tags%s", tags.c_str());
-    Log("LOG-id %lld", node->id);
+    Log("LOG-node_start\n");
+    Log("LOG-tags%s\n", tags.c_str());
+    Log("LOG-id %lld\n", node->id);
+    
+    // Log stats:
+    Log("LOG-stats_start\n");
+    
+    Log("LOG-score %f\n", node->gridInfo->score);
+    Log("LOG-wellpos %d\n", node->gridInfo->wellPos);
+    Log("LOG-welldepth %d\n", node->gridInfo->wellValue);
+    Log("LOG-holes %d\n", node->gridInfo->holes);
+    Log("LOG-holeDepthSqSum %d\n", node->gridInfo->holeDepthSqSum);
+    Log("LOG-bumpiness %d\n", node->gridInfo->bumpiness);
+    
+    Log("LOG-stats_end\n");
+    // Log grid:
     printGrid(node->grid);
-    //printGridInfo(node->gridInfo);
 }
 
 void Solver::processNode(Grid *grid, GridInfo *info, bool isRoot) {
-    // Find well
-    int wellpos = -1;
-    int welldepth = 0;
-
-    info->wellpos = wellpos;
-    info->welldepth = welldepth;
+    // any preprocessing that may need to be done
     
     if (isRoot) return;
     Solver::checkClears(grid, info);
@@ -368,8 +394,14 @@ double Solver::evaluate (Grid *grid, GridInfo *gridInfo, Weights &weights) {
             }
         }
     }
-    
-    
+    // Assign stats to gridinfo
+    gridInfo->wellPos = wellPos;
+    gridInfo->wellValue = wellValue;
+    gridInfo->bumpiness = totalDifference;
+    gridInfo->holes = holes;
+    gridInfo->holeDepthSqSum = cellsCoveringHoles_sq;
+
+    // score calculation
     double score = 0;
     score += maxHeight * weights.height;
     if (maxHeight >= 10) score += maxHeight * weights.height_H2;
@@ -402,7 +434,7 @@ double Solver::evaluate (Grid *grid, GridInfo *gridInfo, Weights &weights) {
     }
     score += totalDifference * weights.bumpiness;
     score += totalDifference_sq * weights.bumpiness_sq;
-    if (wellDepth == 0) score += wellValue * weights.max_well_depth + weights.well_placement[wellPos];
+    if (wellDepth == 0) score += wellValue * weights.max_well_depth * weights.well_placement[wellPos];
     else  score += wellValue * weights.well_depth * weights.well_placement[wellPos];
     score += cellsCoveringHoles * weights.hole_depth;
     score += cellsCoveringHoles_sq * weights.hole_depth_sq;
@@ -471,7 +503,7 @@ std::tuple<Grid*, Pos> Solver::applySpin(Grid& ref, Piece_t piece, Pos pos, int 
 
 void Solver::Explore (Node* ref, Piece_t piece, Weights& weights, void (*treatment)(Node* child)) {
     int rotations = 4;
-    if (piece == Piece_t::I) rotations = 2;
+    //if (piece == Piece_t::I) rotations = 2;
     if (piece == Piece_t::O) rotations = 1;
     
     for (int r=0; r<rotations; r++) {
@@ -559,8 +591,9 @@ void Solver::clearTree(Node* node, Node* exception) {
 }
 
 Output* Solver::solve(Input* input, double pTime, bool returnOutput, bool first) {
+    // open & reset log
     nodes_processed = 0;
-    Log("LOG-solver_start %d", layer);
+    Log("LOG-solver_start %d\n", layer);
     
     Node* root = new Node();
     root->grid = &input->grid;
@@ -604,7 +637,7 @@ Output* Solver::solve(Input* input, double pTime, bool returnOutput, bool first)
             });
         }
         // Logging explored children
-        Log("LOG-children_of %lld %lu", node->id, node->children.size());
+        Log("LOG-children_of %lld %lu\n", node->id, node->children.size());
         for(Node* child : node->children) {
             string tags = "";
             if (child == node->best)
@@ -617,16 +650,15 @@ Output* Solver::solve(Input* input, double pTime, bool returnOutput, bool first)
         if (avg_explore_time == -1) avg_explore_time = explore_time;
         avg_explore_time = (avg_explore_time + explore_time) / 2.0;
         
-        printf("Explore time: %lf, average: %lf\n", explore_time, avg_explore_time);
+        LogBoth("Explore time: %lf, average: %lf\n", explore_time, avg_explore_time);
     } while (time_elapsed < pTime);
-    Log("LOG-solver_end explores %d processed %d", explores, nodes_processed);
-    printf("--- Explores: %d, processed: %d\n", explores, nodes_processed);
-    
+    LogBoth("LOG-solver_end explores %d processed %d\n", explores, nodes_processed);
+    emptyLogBuffer();
     
     if (returnOutput) {
         // If game over
         if (best == nullptr) {
-            Log("LOG-Game_Over");
+            Log("LOG-Game_Over\n");
             return nullptr;
         }
         
@@ -637,27 +669,30 @@ Output* Solver::solve(Input* input, double pTime, bool returnOutput, bool first)
         Output* output = new Output(*nextNode->output);
         output->grid = *best->grid;
         
-        Log("LOG-best_future_grid");
+        Log("LOG-best_future_grid\n");
         printGrid(best->grid, true);
-        LogBoth("LOG-best_move_grid");
+        LogBoth("LOG-best_move_grid\n");
         printGrid(nextNode->grid);
-        LogBoth("LOG-parent_hold: %s", pieceName[(int)root->hold].c_str());
-        LogBoth("LOG-output_hold: %s", pieceName[(int)nextNode->hold].c_str());
+        LogBoth("LOG-parent_hold: %s\n", pieceName[(int)root->hold].c_str());
+        LogBoth("LOG-output_hold: %s\n", pieceName[(int)nextNode->hold].c_str());
         for (auto it = root->piece_it; it != piece_stream.end(); it++) {
             
-            LogBoth("LOG-%s ", pieceName[(int)*it].c_str());
-            if (it == root->piece_it) LogBoth("LOG-<- parent piece_it");
-            if (it == nextNode->piece_it)  LogBoth("LOG-<- output piece_it");
+            LogBoth("LOG-%s \n", pieceName[(int)*it].c_str());
+            if (it == root->piece_it) LogBoth("LOG-<- parent piece_it\n");
+            if (it == nextNode->piece_it)  LogBoth("LOG-<- output piece_it\n");
         }
-        LogBoth("LOG-Solver done, produced output x:%d, r:%d, hold:%d, spin:%d",  output->x, output->r, output->hold, output->spin);
+        LogBoth("LOG-Solver done, produced output x:%d, r:%d, hold:%d, spin:%d\n",  output->x, output->r, output->hold, output->spin);
         
         if (best->gridInfo->clear == Clear_t::tspin_double)
-            LogBoth("LOG-Did tspin double");
+            LogBoth("LOG-Did tspin double\n");
         
         piece_stream.pop_front();
         if (root->hold == Piece_t::None && output->hold)
             piece_stream.pop_front();
     
+        // --- Empty Buffer ---
+        emptyLogBuffer();
+        
         // --- Clear Tree ---
         candidates.clear();
         best = nullptr;

@@ -2,6 +2,9 @@
 #
 # Apple sample code gitignore configuration.
 
+# Logs 
+Logs/
+
 # Finder
 .DS_Store
 

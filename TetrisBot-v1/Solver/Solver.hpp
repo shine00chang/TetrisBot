@@ -55,7 +55,7 @@ struct Weights {
     double bumpiness_sq = -20;
     double max_well_depth = 400;
     double well_depth = 150;
-    double well_placement[10] = {2, -1, 0, 3, 1.5, 1.5, 3, 0, -1.5, 2};
+    double well_placement[10] = {2, -1.5, 0, 0, 1.5, 1.5, 0, 0, -1.5, 2};
     double combo = 150;
     double b2b_bonus = 52;
     double b2b_break = -100;
@@ -73,8 +73,12 @@ struct GridInfo {
     bool spun = false;
     double score = 0;
 
-    int wellpos = -1;
-    int welldepth = 0;
+    // stats
+    int wellPos = -1;
+    int wellValue = 0;
+    int holes = 0;
+    int holeDepthSqSum = 0;
+    int bumpiness = 0;
 };
 struct Input {
     Input (int g[20][10], double *w = nullptr, bool simple = false);
@@ -94,7 +98,7 @@ struct Node {
     std::list<Node*> children;
     Node* parent;
     Node* best = nullptr;
-    long long id = 0;
+    long long id = -1;
     bool explored = false;
     
     Grid* grid;
@@ -125,5 +129,6 @@ public:
     static Output* solve(Input *input, double pTime, bool returnOutput, bool first);
     static void updatePieceStream (int* p, int h, bool first = false);
     static void configLog(bool _should_log, bool _use_NSLog);
+    static void resetSolver();
 };
 #endif /* Solver_hpp */

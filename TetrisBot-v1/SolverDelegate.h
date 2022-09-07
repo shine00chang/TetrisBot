@@ -18,6 +18,7 @@
 @interface SolverDelegate : NSObject
 +(C_SolverOutput*) runSolver: (C_GameData*) game pTime:(double)pTime shouldMove:(bool)shouldMove first:(bool)first;
 +(void) configLog: (bool) should_log useNSLog:(bool)useNSLog;
++(void) resetSolver;
 @end
 
 #endif /* SolverDelegate_h */

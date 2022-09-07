@@ -1,5 +1,4 @@
 import tkinter as tk
-import numpy as np
 import time
 from Settings import *
 
@@ -73,9 +72,20 @@ def readNode():
     node_tags_str = getNextLogLine()
     node_tags = node_tags_str.split()[1:]
 
+    node.tags = node_tags
+
     # read id
     node_id_str = getNextLogLine()
-    node.id = int(node_id_str[node_id_str.find("id") + 2:])
+    node.id = int(node_id_str.split()[-1])
+
+    # read stats
+    stats_start_str = getNextLogLine()
+    stat_str = getNextLogLine()
+    while stat_str != "stats_end":
+        [stat_name, stat_val] = stat_str.split()
+        node.stats[stat_name] = float(stat_val)
+
+        stat_str = getNextLogLine()
 
     # read grid
     grid = node.grid
@@ -104,7 +114,12 @@ def constructNodeFrame(node_id):
 
     node.info_text = tk.Text(node.frame, width=30, height=10)
     node.info_text.insert(tk.END, "Children: {}\n".format(len(node.children)))
-    node.info_text.insert(tk.END, "Id: {}".format(node.id))
+    node.info_text.insert(tk.END, "Id: {}\n".format(node.id))
+
+    # Stats
+    for name, val in node.stats.items():
+        node.info_text.insert(tk.END, "{}: {}\n".format(name, val))
+
     node.info_text.config(state=tk.DISABLED)
     node.info_text.pack()
 
@@ -198,7 +213,10 @@ for node_id, node in nodes.items():
     def getChildrenLength(child_id):
         return len(nodes[child_id].children)
 
-    node.children.sort(reverse=True, key=getChildrenLength)
+    def getChildrenScore(child_id):
+        return nodes[child_id].stats['score']
+
+    node.children.sort(reverse=True, key=getChildrenScore)
 
 
 print("Finished reading, found {} explores".format(explore_sets))
