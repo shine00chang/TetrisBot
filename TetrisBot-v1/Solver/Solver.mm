@@ -17,6 +17,7 @@
 #include <iostream>
 #include <fstream>
 #include <stdio.h>
+#include <array>
 
 #import <Foundation/Foundation.h>
 
@@ -38,6 +39,7 @@ const Weights default_weights = Weights();
 
 // --- Algo ---
 const int kCandidateSize = 30;
+bool useColorGrid = false;
 
 Node* root;
 Node* best;
@@ -159,22 +161,101 @@ GridInfo::GridInfo (Piece_t _piece, Pos _pos, bool _spun) {
     spun = _spun;
 };
 Node::Node() {
+    // Assign id (for analysis)
     //if (NodeIdPool.empty())
         id = NodeIdMax ++;
     /*else {
         id = *NodeIdPool.begin();
         NodeIdPool.erase(NodeIdPool.begin());
     }*/
+    if (useColorGrid) {
+        (*grid).resize(20);
+        for (int y=0; y<20; y++)
+            (*grid)[y] = vector<Piece_t>(10, Piece_t::None);
+    }
+    grid_min.fill(0);
+};
+Node::Node(const Node* node) {
+    // Assign id (for analysis)
+    //if (NodeIdPool.empty())
+        id = NodeIdMax ++;
+    /*else {
+        id = *NodeIdPool.begin();
+        NodeIdPool.erase(NodeIdPool.begin());
+    }*/
+    
+    // construct grids
+    grid_min.fill(0);
+    if (useColorGrid)
+        grid = node->grid;
+    
+    grid_min = node->grid_min;
 };
 Node::~Node() {
+    if (grid != nullptr)
+        delete grid;
+    delete gridInfo;
+    delete output;
+    
     NodeIdPool.insert(id);
 };
+void Node::generateGridMin() {
+    for (int y=0; y<20; y++)
+        for (int x=0; x<10; x++)
+            setGrid(x, y, (*grid)[y][x]);
+};
+Piece_t Node::getGrid(int x, int y) const {
+    if (useColorGrid) {
+        return (*grid)[y][x];
+    } else {
+        int index = y * 10 + x;
+        int arrIndex = index / 64;
+        int i = index % 64;
+        bool b = grid_min[arrIndex] & (1ULL << i);
+        return (b ? Piece_t::Some : Piece_t::None);
+    }
+}
+void Node::setGrid(int x, int y, Piece_t b) {
+    int index = y * 10 + x;
+    int arrIndex = index / 64;
+    int i = index % 64;
+    if (b != Piece_t::None)
+        grid_min[arrIndex] |= (1ULL << i);
+    else
+        grid_min[arrIndex] &= ~(1ULL << i);
+    
+    if (useColorGrid)
+        (*grid)[y][x] = b;
+}
+void Node::setGrid(Grid* ref) {
+    grid = ref;
+    generateGridMin();
+}
+Grid* Node::toColorGrid() const {
+    Grid* _grid = new Grid(20);
+    for (int y=0; y<20; y++)
+        (*_grid)[y] = vector<Piece_t>(10, Piece_t::None);
+    for (int y=0; y<20; y++)
+        for (int x=0; x<10; x++)
+            (*_grid)[y][x] = getGrid(x,y);
+    return _grid;
+}
+const Grid_min* Node::getGridMinPtr() const {
+    return &grid_min;
+}
+const Grid* Node::getGridPtr() const {
+    return grid;
+}
 
-void Solver::printGrid(Grid* grid, bool both) {
+
+void Solver::printGrid(Node* node, bool both) {
     for (int y=0; y<20; y++) {
         string str = "";
         for (int x=0; x<10; x++) {
-            str += (((*grid)[y][x] != Piece_t::None)? '0' + static_cast<int>((*grid)[y][x])-1 : '.');
+            if (useColorGrid)
+                str += ((node->getGrid(x, y) != Piece_t::None) ? '0' + static_cast<int>(node->getGrid(x, y))-1 : '.');
+            else
+                str += ((node->getGrid(x, y) != Piece_t::None) ? '1' : '.');
             str += ' ';
         }
         if (both)
@@ -200,18 +281,16 @@ void Solver::printNode(Node* node, string tags) {
     
     Log("LOG-stats_end\n");
     // Log grid:
-    printGrid(node->grid);
+    printGrid(node);
 }
 
-void Solver::processNode(Grid *grid, GridInfo *info, bool isRoot) {
+void Solver::processNode(Node* node) {
     // any preprocessing that may need to be done
-    
-    if (isRoot) return;
-    Solver::checkClears(grid, info);
+    Solver::checkClears(node);
 }
 
-tuple<Grid*, Pos> Solver::place(Grid& ref, Piece_t piece, int i_x, int r) {
-    Grid *grid = new Grid(ref);
+tuple<Node*, Pos> Solver::place(const Node* ref_node, Piece_t piece, int i_x, int r) {
+    Node* node = new Node(ref_node);
     const vector<int> &piece_map = piece_maps[int(piece)-1][r];
     int n = piece == Piece_t::I ? 5 : 3;
     int c_x = i_x - (piece == Piece_t::I ? 2 : 1);
@@ -230,7 +309,7 @@ tuple<Grid*, Pos> Solver::place(Grid& ref, Piece_t piece, int i_x, int r) {
                         clear = false;
                         continue;
                     }
-                    if ((*grid)[c_y + y][c_x + x] != Piece_t::None)
+                    if (node->getGrid(c_x+x, c_y+y) != Piece_t::None)
                         clear = false;
                 }
         c_y ++;
@@ -247,26 +326,26 @@ tuple<Grid*, Pos> Solver::place(Grid& ref, Piece_t piece, int i_x, int r) {
             if (piece_map[y*n +x]) {
                 if (c_y + y < 0) // if past board limit (game over)
                     return make_tuple(nullptr, Pos(0,0));
-                (*grid)[c_y + y][c_x + x] = piece;
+                node->setGrid(c_x+x, c_y+y, piece);
             }
-    return make_tuple(grid, Pos(c_x, c_y));
+    return make_tuple(node, Pos(c_x, c_y));
 }
 
-void Solver::checkClears(Grid* grid, GridInfo* gridInfo) {
+void Solver::checkClears(Node* node) {
     // 3-Corner Check for tspins.
     bool tspin = false;
-    if (gridInfo->spun && gridInfo->piece == Piece_t::T) {
+    if (node->gridInfo->spun && node->gridInfo->piece == Piece_t::T) {
         int cnt = 0;
-        Pos &pos = gridInfo->pos;
+        Pos &pos = node->gridInfo->pos;
         
         if (pos.first >= 0 && pos.second >= 0 && pos.first < 10 && pos.second < 20)
-            cnt += (*grid)[pos.second][pos.first] != Piece_t::None;
+            cnt += node->getGrid(pos.first  ,pos.second  ) != Piece_t::None;
         if (pos.first+2 >= 0 && pos.second >= 0 && pos.first+2 < 10 && pos.second < 20)
-            cnt += (*grid)[pos.second][pos.first +2] != Piece_t::None;
+            cnt += node->getGrid(pos.first+2,pos.second  ) != Piece_t::None;
         if (pos.first >= 0 && pos.second+2 >= 0 && pos.first < 10 && pos.second+2 < 20)
-            cnt += (*grid)[pos.second +2][pos.first] != Piece_t::None;
+            cnt += node->getGrid(pos.first  ,pos.second+2) != Piece_t::None;
         if (pos.first+2 >= 0 && pos.second+2 >= 0 && pos.first+2 < 10 && pos.second+2 < 20)
-            cnt += (*grid)[pos.second +2][pos.first +2] != Piece_t::None;
+            cnt += node->getGrid(pos.first+2,pos.second+2) != Piece_t::None;
 
         if (cnt >= 3)
             tspin = true;
@@ -277,33 +356,33 @@ void Solver::checkClears(Grid* grid, GridInfo* gridInfo) {
     for (int y=19; y>=0; y--) {
         bool clear = true;
         for (int x=0; x<10; x++) {
-            if ((*grid)[y][x] == Piece_t::None)
+            if (node->getGrid(x,y) == Piece_t::None)
                 clear = false;
             if (clears) {
-                (*grid)[y+clears][x] = (*grid)[y][x];
-                (*grid)[y][x] = Piece_t::None;
+                node->setGrid(x, y+clears, node->getGrid(x,y));
+                node->setGrid(x, y, Piece_t::None);
             }
         }
         if (clear)
             clears ++;
     }
-    gridInfo->clear = static_cast<Clear_t>(clears);
+    node->gridInfo->clear = static_cast<Clear_t>(clears);
 
     if (tspin)
         switch (clears) {
             case 1:
-                gridInfo->clear = Clear_t::tspin_single;
+                node->gridInfo->clear = Clear_t::tspin_single;
                 break;
             case 2:
-                gridInfo->clear = Clear_t::tspin_double;
+                node->gridInfo->clear = Clear_t::tspin_double;
                 break;
             case 3:
-                gridInfo->clear = Clear_t::tspin_triple;
+                node->gridInfo->clear = Clear_t::tspin_triple;
                 break;
         }
 }
 
-double Solver::evaluate (Grid *grid, GridInfo *gridInfo, Weights &weights) {
+double Solver::evaluate(Node* node, Weights &weights) {
     
     int maxHeight = -1;
     int holes = 0;
@@ -318,11 +397,11 @@ double Solver::evaluate (Grid *grid, GridInfo *gridInfo, Weights &weights) {
     for (int x=0; x<10; x++) {
         for (int y=0; y<20; y++) {
             // height
-            if ((*grid)[y][x] != Piece_t::None && heights[x] == 0)
+            if (node->getGrid(x,y) != Piece_t::None && heights[x] == 0)
                 heights[x] = 20 - y;
             // holes
             if (y > 0) {
-                if ((*grid)[y][x] == Piece_t::None && (*grid)[y-1][x] != Piece_t::None) {
+                if (node->getGrid(x,y) == Piece_t::None && node->getGrid(x,y-1) != Piece_t::None) {
                     int cells = heights[x] - (20-y);
                     cellsCoveringHoles += cells;
                     cellsCoveringHoles_sq += cells * cells;
@@ -344,7 +423,7 @@ double Solver::evaluate (Grid *grid, GridInfo *gridInfo, Weights &weights) {
     for (int y=19-wellDepth; y>=0; y--) {
         bool full = true;
         for (int x=0; x<10; x++)
-            if (x != wellPos && (*grid)[y][x] == Piece_t::None)
+            if (x != wellPos && node->getGrid(x,y) == Piece_t::None)
                 full = false;
         wellValue += full;
         if (not full)
@@ -380,9 +459,9 @@ double Solver::evaluate (Grid *grid, GridInfo *gridInfo, Weights &weights) {
                 
                 for (int i=0; i<3 && possible; i++) {
                     for (int j=0; j<3 && possible; j++) {
-                        if ( map[i*3 + j] && (*grid)[y + i][x + j] != Piece_t::None)  // if filled on right spot (+ points)
+                        if ( map[i*3 + j] && node->getGrid(x + j, y + i) != Piece_t::None)  // if filled on right spot (+ points)
                             completion ++;
-                        if (!map[i*3 + j] && (*grid)[y + i][x + j] != Piece_t::None)  // if filled when not supposed to (fail).
+                        if (!map[i*3 + j] && node->getGrid(x + j, y + i) != Piece_t::None)  // if filled when not supposed to (fail).
                             possible = false;
                     }
                 }
@@ -395,11 +474,11 @@ double Solver::evaluate (Grid *grid, GridInfo *gridInfo, Weights &weights) {
         }
     }
     // Assign stats to gridinfo
-    gridInfo->wellPos = wellPos;
-    gridInfo->wellValue = wellValue;
-    gridInfo->bumpiness = totalDifference;
-    gridInfo->holes = holes;
-    gridInfo->holeDepthSqSum = cellsCoveringHoles_sq;
+    node->gridInfo->wellPos = wellPos;
+    node->gridInfo->wellValue = wellValue;
+    node->gridInfo->bumpiness = totalDifference;
+    node->gridInfo->holes = holes;
+    node->gridInfo->holeDepthSqSum = cellsCoveringHoles_sq;
 
     // score calculation
     double score = 0;
@@ -407,7 +486,7 @@ double Solver::evaluate (Grid *grid, GridInfo *gridInfo, Weights &weights) {
     if (maxHeight >= 10) score += maxHeight * weights.height_H2;
     if (maxHeight >= 15) score += maxHeight * weights.height_Q4;
     score += holes * weights.holes;
-    switch (gridInfo->clear) {
+    switch (node->gridInfo->clear) {
         case Clear_t::clear1:
             score += weights.clear1;
             break;
@@ -445,7 +524,7 @@ double Solver::evaluate (Grid *grid, GridInfo *gridInfo, Weights &weights) {
     return score;
 }
 
-std::tuple<Grid*, Pos> Solver::applySpin(Grid& ref, Piece_t piece, Pos pos, int r, int nr) {
+std::tuple<Node*, Pos> Solver::applySpin(const Node* ref, Piece_t piece, Pos pos, int r, int nr) {
     // the kick table is generated under
     // the assumption that y axis grows upwards
     
@@ -473,13 +552,13 @@ std::tuple<Grid*, Pos> Solver::applySpin(Grid& ref, Piece_t piece, Pos pos, int 
                         clear = false;
                         continue;
                     }
-                    if (ref[npos.second + i][npos.first + j] != Piece_t::None)
+                    if (ref->getGrid(npos.first + j, npos.second + i) != Piece_t::None)
                         clear = false;
                 }
             
         if (clear) {
             // shift it down to the lowest available coordinate
-            Grid* grid = new Grid(ref);
+            Node* node = new Node(ref);
             bool clear = true;
             int k = 0;
             while (clear) {
@@ -487,15 +566,15 @@ std::tuple<Grid*, Pos> Solver::applySpin(Grid& ref, Piece_t piece, Pos pos, int 
                 for (int i=0; i<n; i++)
                     for (int j=0; j<n; j++)
                         if (map[i*n + j])
-                            if (npos.second + i + k > 19 || (*grid)[npos.second + i + k][npos.first + j] != Piece_t::None)
+                            if (npos.second + i + k > 19 || node->getGrid(npos.first + j, npos.second + i + k) != Piece_t::None)
                                 clear = false;
             }
             npos.second += k-1;
             for (int i=0; i<n; i++)
                 for (int j=0; j<n; j++)
                     if (map[i*n + j])
-                        (*grid)[npos.second + i][npos.first + j] = piece;
-            return make_tuple(grid, npos);
+                        node->setGrid(npos.first + j, npos.second + i, piece);
+            return make_tuple(node, npos);
         }
     }
     return make_tuple(nullptr, Pos(0,0));
@@ -508,33 +587,30 @@ void Solver::Explore (Node* ref, Piece_t piece, Weights& weights, void (*treatme
     
     for (int r=0; r<rotations; r++) {
         for (int x=0; x<10; x++) {
-            pair<Grid*, Pos> pathes[3];
-            pathes[0] = Solver::place(*ref->grid, piece, x, r);
+            pair<Node*, Pos> pathes[3];
+            pathes[0] = Solver::place(ref, piece, x, r);
             if (pathes[0].first == nullptr)
                 continue;
             
-            // NOTE: the pos values returned by 'place' is a coner pos, not center pos.
-            pathes[1] = Solver::applySpin(*ref->grid, piece, pathes[0].second, r, (r+1)%4);
-            pathes[2] = Solver::applySpin(*ref->grid, piece, pathes[0].second, r, (r+3)%4);
+            // NOTE: the pos values returned by 'place' is a corner pos, not center pos.
+            pathes[1] = Solver::applySpin(ref, piece, pathes[0].second, r, (r+1)%4);
+            pathes[2] = Solver::applySpin(ref, piece, pathes[0].second, r, (r+3)%4);
 
             for (int i=0; i<3; i++) {
-                Grid* grid = pathes[i].first;
+                Node* child = pathes[i].first;
                 Pos pos = pathes[i].second;
-                if (grid == nullptr) continue;
+                if (child == nullptr) continue;
                 
                 // --- Evaluate Child ---
-                GridInfo *gridInfo = new GridInfo(piece, pos, i != 0 ? true : false);
-                Solver::checkClears(grid, gridInfo);
-                gridInfo->score = Solver::evaluate(grid, gridInfo, weights);
+                child->gridInfo = new GridInfo(piece, pos, i != 0 ? true : false);
+                Solver::checkClears(child);
+                child->gridInfo->score = Solver::evaluate(child, weights);
                 // --- Create corresponding output for child ---
                 Output* output = new Output(x,r,false);
                 if (i == 1) output->spin =  1;
                 if (i == 2) output->spin = -1;
                 // --- Construct Child ---
-                Node* child = new Node();
                 child->parent = ref;
-                child->grid = grid;
-                child->gridInfo = gridInfo;
                 child->output = output;
                 child->piece_it = next(ref->piece_it);
                 child->hold = ref->hold;
@@ -584,9 +660,6 @@ void Solver::clearTree(Node* node, Node* exception) {
     for (Node* child : node->children)
         if (child != exception)
             clearTree(child);
-    delete node->grid;
-    delete node->gridInfo;
-    delete node->output;
     delete node;
 }
 
@@ -596,7 +669,8 @@ Output* Solver::solve(Input* input, double pTime, bool returnOutput, bool first)
     Log("LOG-solver_start %d\n", layer);
     
     Node* root = new Node();
-    root->grid = &input->grid;
+    root->setGrid(&input->grid);
+    root->generateGridMin();
     root->piece_it = piece_stream.begin();
     root->hold = rootHold;
     root->gridInfo = new GridInfo(Piece_t::None, Pos(0,0), false);
@@ -667,12 +741,12 @@ Output* Solver::solve(Input* input, double pTime, bool returnOutput, bool first)
         while (nextNode->parent != root)
             nextNode = nextNode->parent;
         Output* output = new Output(*nextNode->output);
-        output->grid = *best->grid;
+        output->grid = *(useColorGrid ? best->getGridPtr() : best->toColorGrid());
         
         Log("LOG-best_future_grid\n");
-        printGrid(best->grid, true);
+        printGrid(best, true);
         LogBoth("LOG-best_move_grid\n");
-        printGrid(nextNode->grid);
+        printGrid(nextNode);
         LogBoth("LOG-parent_hold: %s\n", pieceName[(int)root->hold].c_str());
         LogBoth("LOG-output_hold: %s\n", pieceName[(int)nextNode->hold].c_str());
         for (auto it = root->piece_it; it != piece_stream.end(); it++) {

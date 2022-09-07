@@ -13,6 +13,8 @@
 #include <vector>
 #include <list>
 #include <set>
+#include <array>
+
 extern const std::string pieceName [9];
 enum class Piece_t : int {
     None,
@@ -23,7 +25,8 @@ enum class Piece_t : int {
     T,
     I,
     O,
-    Garbage
+    Garbage,
+    Some,
 };
 enum class Clear_t : int {
     None,
@@ -38,6 +41,7 @@ enum class Clear_t : int {
 
 typedef std::pair<int,int> Pos;
 typedef std::vector<std::vector<Piece_t>> Grid;
+typedef std::array<u_int64_t, 4> Grid_min;
 
 const int kWeights = 16;
 struct Weights {
@@ -93,36 +97,51 @@ struct Output {
     Grid grid;
 };
 struct Node {
+private:
+    Grid* grid = nullptr;
+    Grid_min grid_min;
+    
+public:
     Node ();
+    Node (const Node* node);
     ~Node ();
+    
+    
+    void generateGridMin();
+    Grid* toColorGrid() const;
+    Piece_t getGrid (int x, int y) const;
+    void setGrid(int x, int y, Piece_t p);
+    void setGrid(Grid* ref);
+    const Grid_min* getGridMinPtr() const;
+    const Grid* getGridPtr() const;
+
     std::list<Node*> children;
-    Node* parent;
+    Node* parent = nullptr;
     Node* best = nullptr;
     long long id = -1;
     bool explored = false;
     
-    Grid* grid;
     std::list<Piece_t>::iterator piece_it;
     Piece_t hold = Piece_t::None;
-    GridInfo* gridInfo;
+    GridInfo* gridInfo = nullptr;
     Output* output = nullptr;
     int layer = 0;
 };
 
 class Solver {
     // --- Mechanics ---
-    static double evaluate(Grid *grid, GridInfo* gridInfo, Weights &weights);
-    static void checkClears (Grid* grid, GridInfo* gridInfo);
-    static void processNode (Grid *grid, GridInfo *info, bool isRoot = false);
-    static std::tuple<Grid*, Pos> applySpin(Grid& ref, Piece_t Piece, Pos pos, int r, int nr);
-    static std::tuple<Grid*, Pos> place (Grid &ref, Piece_t piece, int x, int r);
+    static double evaluate(Node* node, Weights &weights);
+    static void checkClears (Node* node);
+    static void processNode (Node* node);
+    static std::tuple<Node*, Pos> applySpin(const Node* ref, Piece_t Piece, Pos pos, int r, int nr);
+    static std::tuple<Node*, Pos> place (const Node* ref, Piece_t piece, int x, int r);
 
     // --- Algo ---
     static void Explore (Node* ref, Piece_t piece, Weights& weights, void (*treatment)(Node* child) = [](Node* child){return;});
     static void clearTree (Node* node, Node* exception = nullptr);
     
     // --- Helper ---
-    static void printGrid (Grid* grid, bool both=false);
+    static void printGrid (Node* node, bool both=false);
     static void printNode (Node* node, std::string tags="");
 
 public:
