@@ -45,6 +45,7 @@ Node* root;
 Node* best;
 list<Node*> candidates;
 list<Piece_t> piece_stream;
+set<Grid_min> visitedGrids;
 Piece_t rootHold;
 int layer = 0;
 
@@ -71,6 +72,13 @@ void Solver::resetSolver() {
     layer = 0;
     memset(logBuffer, 0, sizeof(logBuffer));
     fs.open(path, fstream::out | fstream::trunc);
+}
+
+bool operator<(const Grid_min& a, const Grid_min& b) {
+    for (int i=0; i<4; i++)
+        if (a[i] != b[i])
+            return a[i] < b[i];
+    return false;
 }
 
 template<typename ... Args>
@@ -168,12 +176,14 @@ Node::Node() {
         id = *NodeIdPool.begin();
         NodeIdPool.erase(NodeIdPool.begin());
     }*/
+    
     if (useColorGrid) {
         (*grid).resize(20);
         for (int y=0; y<20; y++)
             (*grid)[y] = vector<Piece_t>(10, Piece_t::None);
     }
-    grid_min.fill(0);
+    grid_min = new array<u_int64_t, 4>();
+    grid_min->fill(0ULL);
 };
 Node::Node(const Node* node) {
     // Assign id (for analysis)
@@ -185,15 +195,15 @@ Node::Node(const Node* node) {
     }*/
     
     // construct grids
-    grid_min.fill(0);
     if (useColorGrid)
-        grid = node->grid;
+        grid = new Grid(*node->grid);
     
-    grid_min = node->grid_min;
+    grid_min = new Grid_min(*node->grid_min);
 };
 Node::~Node() {
     if (grid != nullptr)
         delete grid;
+    delete grid_min;
     delete gridInfo;
     delete output;
     
@@ -211,7 +221,7 @@ Piece_t Node::getGrid(int x, int y) const {
         int index = y * 10 + x;
         int arrIndex = index / 64;
         int i = index % 64;
-        bool b = grid_min[arrIndex] & (1ULL << i);
+        bool b = (*grid_min)[arrIndex] & (1ULL << i);
         return (b ? Piece_t::Some : Piece_t::None);
     }
 }
@@ -220,9 +230,9 @@ void Node::setGrid(int x, int y, Piece_t b) {
     int arrIndex = index / 64;
     int i = index % 64;
     if (b != Piece_t::None)
-        grid_min[arrIndex] |= (1ULL << i);
+        (*grid_min)[arrIndex] |= (1ULL << i);
     else
-        grid_min[arrIndex] &= ~(1ULL << i);
+        (*grid_min)[arrIndex] &= ~(1ULL << i);
     
     if (useColorGrid)
         (*grid)[y][x] = b;
@@ -241,12 +251,14 @@ Grid* Node::toColorGrid() const {
     return _grid;
 }
 const Grid_min* Node::getGridMinPtr() const {
-    return &grid_min;
+    return grid_min;
 }
 const Grid* Node::getGridPtr() const {
     return grid;
 }
-
+/*const bool Node::addToVisited(set<Grid_min>* visited) const {
+    return visited->emplace(move(grid_min)).second;
+}*/
 
 void Solver::printGrid(Node* node, bool both) {
     for (int y=0; y<20; y++) {
@@ -601,6 +613,11 @@ void Solver::Explore (Node* ref, Piece_t piece, Weights& weights, void (*treatme
                 Pos pos = pathes[i].second;
                 if (child == nullptr) continue;
                 
+                // --- Check if reoccurance ---
+                if (visitedGrids.emplace(move(*child->getGridMinPtr())).second == false)
+                    continue;
+                
+                
                 // --- Evaluate Child ---
                 child->gridInfo = new GridInfo(piece, pos, i != 0 ? true : false);
                 Solver::checkClears(child);
@@ -773,6 +790,7 @@ Output* Solver::solve(Input* input, double pTime, bool returnOutput, bool first)
         NodeIdPool.clear();
         NodeIdMax = 1;
         Solver::clearTree(root);
+        visitedGrids.clear();
         
         return output;
     } else

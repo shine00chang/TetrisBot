@@ -99,7 +99,7 @@ struct Output {
 struct Node {
 private:
     Grid* grid = nullptr;
-    Grid_min grid_min;
+    Grid_min* grid_min = nullptr;
     
 public:
     Node ();
@@ -114,6 +114,7 @@ public:
     void setGrid(Grid* ref);
     const Grid_min* getGridMinPtr() const;
     const Grid* getGridPtr() const;
+    //const bool addToVisited(std::set<Grid_min>* visited) const;
 
     std::list<Node*> children;
     Node* parent = nullptr;
