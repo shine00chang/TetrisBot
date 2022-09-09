@@ -18,6 +18,7 @@
 #include <fstream>
 #include <stdio.h>
 #include <array>
+#include <map>
 
 #import <Foundation/Foundation.h>
 
@@ -41,6 +42,8 @@ const Weights default_weights = Weights();
 const int kCandidateSize = 30;
 bool useColorGrid = false;
 
+Weights weights;
+
 Node* root;
 Node* best;
 list<Node*> candidates;
@@ -53,25 +56,84 @@ std::set<long long> NodeIdPool;
 long long NodeIdMax = 1;
 
 // --- Logging ---
-const char* path = "/Users/shinechang/Documents/CS/CS-dev/TetrisBot/Logs/log1.txt";
-fstream fs(path, fstream::out);
+const char* kLogFilePath = "/Users/shinechang/Documents/CS/CS-dev/TetrisBot/Logs/log1.txt";
+const char* kConfigFilePath = "./config.txt";
+ofstream fs(kLogFilePath, fstream::out);
 const int kLogBufferSize = 1000;
 char logBuffer[kLogBufferSize * 2];
 int nodes_processed = 0;
 double avg_explore_time = -1;
-bool use_NSLog = false;
 bool should_log = false;
 
-void Solver::configLog(bool _should_log, bool _use_NSLog) {
-    should_log = _should_log;
-    use_NSLog = _use_NSLog;
+void Solver::loadConfigs () {
+    
+    map<string, double> weightsMap;
+    map<string, string> logMap;
+    ifstream config_ifs;
+    config_ifs.open(kConfigFilePath);
+
+    // If file exists, read
+    if (config_ifs) {
+        string s;
+        getline(config_ifs, s);
+        
+        while (!s.empty()) {
+            if (s.compare("log_config_start")) {
+                // -- Read Log configs
+                for (;s.compare("log_config_end"); getline(config_ifs, s)) {
+                    if (s.substr(0,2).compare("//") == 0) continue;
+                    auto pos = s.find(": ");
+                    string key = s.substr(0, pos);
+
+                    if (pos == string::npos) {
+                        string value = s.substr(pos + 2);
+                        logMap[key] = value;
+                    } else
+                        logMap[key] = "";
+                }
+            }
+            if (s.compare("weights_start")) {
+                // -- Read Weights configs
+                for (;s.compare("weights_end"); getline(config_ifs, s)) {
+                    auto pos = s.find(": ");
+                    string key = s.substr(0, pos);
+                    string value = s.substr(pos + 2);
+                    
+                    weightsMap[key] = stod(value);
+                }
+            }
+        }
+    }
+    // -- Set log configs --
+    should_log = logMap.count("should_log");
+    
+    // -- Set weights --
+    weights = default_weights;
+    if (weightsMap.count("height")) weights.height = weightsMap["height"];
+    if (weightsMap.count("height_H2")) weights.height_H2 = weightsMap["height_H2"];
+    if (weightsMap.count("height_Q2")) weights.height_Q4 = weightsMap["height_Q4"];
+    if (weightsMap.count("holes")) weights.holes = weightsMap["holes"];
+    if (weightsMap.count("hole_depth")) weights.hole_depth = weightsMap["hole_depth"];
+    if (weightsMap.count("hole_depth_sq")) weights.hole_depth_sq = weightsMap["hole_depth_sq"];
+    if (weightsMap.count("clear1")) weights.clear1 = weightsMap["clear1"];
+    if (weightsMap.count("clear2")) weights.clear2 = weightsMap["clear2"];
+    if (weightsMap.count("clear3")) weights.clear3 = weightsMap["clear3"];
+    if (weightsMap.count("clear4")) weights.clear4 = weightsMap["clear4"];
+    if (weightsMap.count("bumpiness")) weights.bumpiness = weightsMap["bumpiness"];
+    if (weightsMap.count("bumpiness_sq")) weights.bumpiness_sq = weightsMap["bumpiness_sq"];
+    if (weightsMap.count("max_well_depth")) weights.max_well_depth = weightsMap["max_well_depth"];
+    if (weightsMap.count("well_depth")) weights.well_depth = weightsMap["well_depth"];
+    if (weightsMap.count("tspin_single")) weights.tspin_single = weightsMap["tspin_single"];
+    if (weightsMap.count("tspin_double")) weights.tspin_double = weightsMap["tspin_double"];
+    if (weightsMap.count("tspin_triple")) weights.tspin_triple = weightsMap["tspin_triple"];
+    if (weightsMap.count("tspin_completion_sq")) weights.tspin_completion_sq = weightsMap["tspin_completion_sq"];
 }
 
 void Solver::resetSolver() {
     fs.close();
     layer = 0;
     memset(logBuffer, 0, sizeof(logBuffer));
-    fs.open(path, fstream::out | fstream::trunc);
+    fs.open(kLogFilePath, fstream::out | fstream::trunc);
 }
 
 bool operator<(const Grid_min& a, const Grid_min& b) {
@@ -112,56 +174,11 @@ void emptyLogBuffer () {
 }
 
 
-Input::Input (int g[20][10], double *w, bool simple) {
+Input::Input (int g[20][10], bool simple) {
     grid = Grid(20, vector<Piece_t>(10));
     for (int y=0; y<20; y++)
         for (int x=0; x<10; x++) 
             grid  [y][x] = static_cast<Piece_t>( g[y][x] );
-        
-        
-    if (w == nullptr)
-        weights = default_weights;
-    else {
-        if (!simple) {
-            weights.height = -w[0];
-            weights.height_H2 = -w[1];
-            weights.height_Q4 = -w[2];
-            weights.holes = -w[3];
-            weights.hole_depth = -w[4];
-            weights.hole_depth_sq = -w[5];
-            weights.clear1 = w[6];
-            weights.clear2 = w[7];
-            weights.clear3 = w[8];
-            weights.clear4 = w[9];
-            weights.bumpiness = -w[10];
-            weights.bumpiness_sq = -w[11];
-            weights.max_well_depth = w[12];
-            weights.well_depth = w[13];
-            weights.tspin_single = w[14];
-            weights.tspin_double = w[15];
-            weights.tspin_triple = w[16];
-            weights.tspin_completion_sq = w[17];
-        } else {
-            weights.height = -w[0];
-            weights.height_H2 = 0;
-            weights.height_Q4 = 0;
-            weights.holes = -w[1];
-            weights.hole_depth = 0;
-            weights.hole_depth_sq = 0;
-            weights.clear1 = w[2];
-            weights.clear2 = w[2];
-            weights.clear3 = w[2];
-            weights.clear4 = w[2];
-            weights.bumpiness = -w[3];
-            weights.bumpiness_sq = 0;
-            weights.max_well_depth = 0;
-            weights.well_depth = 0;
-            weights.tspin_single = 0;
-            weights.tspin_double = 0;
-            weights.tspin_triple = 0;
-            weights.tspin_completion_sq = 0;
-        }
-    }
 };
 GridInfo::GridInfo (Piece_t _piece, Pos _pos, bool _spun) {
     piece = _piece;
@@ -394,7 +411,7 @@ void Solver::checkClears(Node* node) {
         }
 }
 
-double Solver::evaluate(Node* node, Weights &weights) {
+double Solver::evaluate(Node* node) {
     
     int maxHeight = -1;
     int holes = 0;
@@ -592,7 +609,7 @@ std::tuple<Node*, Pos> Solver::applySpin(const Node* ref, Piece_t piece, Pos pos
     return make_tuple(nullptr, Pos(0,0));
 }
 
-void Solver::Explore (Node* ref, Piece_t piece, Weights& weights, void (*treatment)(Node* child)) {
+void Solver::Explore (Node* ref, Piece_t piece, void (*treatment)(Node* child)) {
     int rotations = 4;
     //if (piece == Piece_t::I) rotations = 2;
     if (piece == Piece_t::O) rotations = 1;
@@ -621,7 +638,7 @@ void Solver::Explore (Node* ref, Piece_t piece, Weights& weights, void (*treatme
                 // --- Evaluate Child ---
                 child->gridInfo = new GridInfo(piece, pos, i != 0 ? true : false);
                 Solver::checkClears(child);
-                child->gridInfo->score = Solver::evaluate(child, weights);
+                child->gridInfo->score = Solver::evaluate(child);
                 // --- Create corresponding output for child ---
                 Output* output = new Output(x,r,false);
                 if (i == 1) output->spin =  1;
@@ -711,16 +728,16 @@ Output* Solver::solve(Input* input, double pTime, bool returnOutput, bool first)
         } else
             node = root;
     
-        Solver::Explore(node, *node->piece_it, input->weights);
+        Solver::Explore(node, *node->piece_it);
         if (node->hold != Piece_t::None)
-            Solver::Explore(node, node->hold, input->weights, [](Node* child){
+            Solver::Explore(node, node->hold, [](Node* child){
                 child->output->hold = true;
                 child->hold = *child->parent->piece_it;
             });
         else {
             auto piece_it = node->piece_it;
             piece_it ++;
-            Solver::Explore(node, *piece_it, input->weights, [](Node* child) {
+            Solver::Explore(node, *piece_it, [](Node* child) {
                 child->output->hold = true;
                 auto parent_piece_it = child->parent->piece_it;
                 child->hold = *parent_piece_it;

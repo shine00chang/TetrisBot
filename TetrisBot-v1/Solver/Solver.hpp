@@ -46,27 +46,27 @@ typedef std::array<u_int64_t, 4> Grid_min;
 const int kWeights = 16;
 struct Weights {
     double height = 0;
-    double height_H2 = -150;
-    double height_Q4 = -511;
-    double holes = -400;
-    double hole_depth = -50;
-    double hole_depth_sq = 20;
-    double clear1 = -230;
+    double height_H2 = -15;
+    double height_Q4 = -50;
+    double holes = -70;
+    double hole_depth = -15;
+    double hole_depth_sq = -4;
+    double clear1 = -200;
     double clear2 = -200;
-    double clear3 = -160;
+    double clear3 = -200;
     double clear4 = 10000;
-    double bumpiness = -10;
-    double bumpiness_sq = -20;
-    double max_well_depth = 400;
-    double well_depth = 150;
+    double bumpiness = -2;
+    double bumpiness_sq = -4;
+    double max_well_depth = 60;
+    double well_depth = 20;
     double well_placement[10] = {2, -1.5, 0, 0, 1.5, 1.5, 0, 0, -1.5, 2};
     double combo = 150;
-    double b2b_bonus = 52;
+    double b2b_bonus = 50;
     double b2b_break = -100;
     double tspin_single = -100;
     double tspin_double = 4000;
     double tspin_triple = 10000;
-    double tspin_completion_sq = 50;
+    double tspin_completion_sq = 0;
 };
 
 struct GridInfo {
@@ -85,9 +85,8 @@ struct GridInfo {
     int bumpiness = 0;
 };
 struct Input {
-    Input (int g[20][10], double *w = nullptr, bool simple = false);
+    Input (int g[20][10], bool simple = false);
     Grid grid;
-    Weights weights;
 };
 struct Output {
     Output (int _x, int _r, bool _hold) : x{_x}, r{_r}, hold{_hold}{};
@@ -131,14 +130,14 @@ public:
 
 class Solver {
     // --- Mechanics ---
-    static double evaluate(Node* node, Weights &weights);
+    static double evaluate(Node* node);
     static void checkClears (Node* node);
     static void processNode (Node* node);
     static std::tuple<Node*, Pos> applySpin(const Node* ref, Piece_t Piece, Pos pos, int r, int nr);
     static std::tuple<Node*, Pos> place (const Node* ref, Piece_t piece, int x, int r);
 
     // --- Algo ---
-    static void Explore (Node* ref, Piece_t piece, Weights& weights, void (*treatment)(Node* child) = [](Node* child){return;});
+    static void Explore (Node* ref, Piece_t piece, void (*treatment)(Node* child) = [](Node* child){return;});
     static void clearTree (Node* node, Node* exception = nullptr);
     
     // --- Helper ---
@@ -148,7 +147,9 @@ class Solver {
 public:
     static Output* solve(Input *input, double pTime, bool returnOutput, bool first);
     static void updatePieceStream (int* p, int h, bool first = false);
-    static void configLog(bool _should_log, bool _use_NSLog);
     static void resetSolver();
+    
+    // Config (settings)
+    static void loadConfigs();
 };
 #endif /* Solver_hpp */

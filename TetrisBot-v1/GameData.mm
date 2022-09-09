@@ -28,7 +28,4 @@
 -(void) setHold: (const int) val {
     self->hold = val;
 }
--(void) setWeight: (int)i val:(double)val {
-    self->weights[i] = val;
-}
 @end

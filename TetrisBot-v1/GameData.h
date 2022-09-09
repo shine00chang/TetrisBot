@@ -15,12 +15,10 @@
     @public int grid[20][10];
     @public int *pieces;
     @public int hold;
-    @public double weights[18];
 }
 -(id) init;
 -(void) setPieces: (int)i :(const int) piece;
 -(void) setHold: (const int) piece;
 -(void) setGrid: (int)x :(int)y :(int) grid;
--(void) setWeight: (int)i val:(double)val;
 @end;
 #endif /* GameData_h */

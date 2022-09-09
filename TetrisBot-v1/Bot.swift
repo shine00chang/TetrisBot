@@ -11,49 +11,6 @@ import ScreenCaptureKit
 import VideoToolbox
 import SwiftUI
 
-let kWeights = 18
-let kWeightLabels:[String] = [
-    "height",
-    "height_H2",
-    "height_Q4",
-    "holes",
-    "hole_depth",
-    "hole_depth_sq",
-    "clear1",
-    "clear2",
-    "clear3",
-    "clear4",
-    "bumpiness",
-    "bumpiness_sq",
-    "max_well_depth",
-    "well_depth",
-    "tspin_single",
-    "tspin_double",
-    "tspin_triple",
-    "tspin_completion_sq"
-];
-let kWeightDefaults:[Double] = [
-    0,
-    15,
-    50,
-    70,
-    15,
-    4,
-    -200,
-    -200,
-    -200,
-    10000,
-    2,
-    4,
-    60,
-    20,
-    0,
-    0,
-    0,
-    0,
-];
-
-
 class GameData: ObservableObject {
     @Published var grid: [[Piece]] = [];
     @Published var predictionGrid: [[Piece]] = [];
@@ -94,7 +51,6 @@ func printGrid (_ grid:[[Piece]]) {
 
 class Bot: ObservableObject {
     
-    @Published var weights: [String];
     @Published var moveWaitTimeInput: String = "0.2";
     
     @State var c_gameData: C_GameData = C_GameData();
@@ -117,14 +73,6 @@ class Bot: ObservableObject {
     var movesRequested: Int = 0;
     var moveNumber: Int = 0;
     var solving: Bool = false;
-    
-    init () {
-        var weights: [String] = []
-        for weightDefault in kWeightDefaults {
-            weights.append(String(format: "%f", weightDefault));
-        }
-        self.weights = weights;
-    }
     
     func checkRun () {
         // if game over
@@ -198,19 +146,7 @@ class Bot: ObservableObject {
 
         // Clear log file
         SolverDelegate.resetSolver();
-        
-        // Set weights
-        self.errorMessage = nil;
-        print("weight -----")
-        for i in 0..<kWeights {
-            if let weight = Double(weights[i]) {
-                c_gameData.setWeight(Int32(i), val:weight);
-                print("weight \(i): \(weight)");
-            } else {
-                errorMessage = "INVALID WEIGHT. NOT A DOUBLE: \(weights[i])";
-                return;
-            }
-        }
+
         // Set time-related configs
         if let moveWaitTime = Double(moveWaitTimeInput) {
             self.moveWaitTime = moveWaitTime;
@@ -225,8 +161,8 @@ class Bot: ObservableObject {
             errorMessage = "INVALID TIMEOUT. NOT A DOUBLE: \(waitTimeoutLimitInput)";
             return;
         }
-        // Set logger configs
-        SolverDelegate.configLog(self.should_log, useNSLog: self.useNSLog);
+        // Set Solver configs
+        SolverDelegate.loadConfigs();
     }
     func translateGameData() {
         for y in 0..<20 {

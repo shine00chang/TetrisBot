@@ -36,7 +36,7 @@
     }
     
     Solver::updatePieceStream(game->pieces, game->hold, first);
-    Output *output = Solver::solve(new Input(game->grid, game->weights), pTime, shouldMove, first);
+    Output *output = Solver::solve(new Input(game->grid), pTime, shouldMove, first);
     if (not shouldMove)
         return nullptr;
     if (output == nullptr) {
@@ -51,8 +51,8 @@
     return ret;
 }
 
-+(void) configLog:(bool)should_log useNSLog:(bool)useNSLog {
-    Solver::configLog(should_log, useNSLog);
++(void) loadConfigs {
+    Solver::loadConfigs();
 }
 +(void) resetSolver {
     Solver::resetSolver();

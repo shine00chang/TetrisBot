@@ -13,14 +13,6 @@ import AppTrackingTransparency
 
 var gameData: GameData = GameData();
 
-func redirectLogToDocuments() {
-    /*
-    let path = "/Users/shinechang/Documents/CS/CS-dev/TetrisBot/Logs/log1.txt";
-    print("log_path: \(path)");
-    freopen(path, "w", stderr); // NSLOG
-    //freopen(path, "w", stdout); // (c++) printf & (swift) print
-     */
-}
 
 struct CaptureView: View {
 
@@ -51,9 +43,6 @@ struct CaptureView: View {
         .filter {
             $0.owningApplication != nil && $0.owningApplication?.applicationName != "" && $0.owningApplication?.applicationName != "Control Center"
         }
-    }
-    init () {
-        redirectLogToDocuments();
     }
     
     var body: some View {
@@ -95,12 +84,26 @@ struct CaptureView: View {
                 Toggle("Show Gray Scale", isOn: $grayScale)
                     .toggleStyle(SwitchToggleStyle())
                 Text("Average Frame Data Extraction Time: \(self.screenRecorder.averageFrameDataExtractionTime)")
-                // Logger Control
-                HStack {
-                    Toggle("Should Log", isOn: $bot.should_log)
-                        .toggleStyle(SwitchToggleStyle());
-                    Toggle("use NSLog", isOn: $bot.useNSLog)
-                        .toggleStyle(SwitchToggleStyle());
+
+                // -- Bot Error Message --
+                if let errorMessage = bot.errorMessage {
+                    Text(errorMessage)
+                        .foregroundColor(.red);
+                }
+                // -- Speed Control --
+                TextField("Piece per Second", text: $bot.moveWaitTimeInput)
+                    .onReceive(Just(bot.moveWaitTimeInput)) { newValue in
+                        let filtered = newValue.filter { "0123456789.".contains($0) }
+                        if (filtered != bot.moveWaitTimeInput) {
+                            bot.moveWaitTimeInput = filtered;
+                        }
+                 }
+                TextField("Wait Timeout limit", text: $bot.waitTimeoutLimitInput)
+                    .onReceive(Just(bot.waitTimeoutLimitInput)) { newValue in
+                        let filtered = newValue.filter { "0123456789.".contains($0) }
+                        if (filtered != bot.waitTimeoutLimitInput) {
+                            bot.waitTimeoutLimitInput = filtered;
+                        }
                 }
                 bot.controlPannelView
             }
@@ -118,40 +121,6 @@ struct CaptureView: View {
         }
         Divider()
         HStack {
-            // Bot Control
-            ScrollView {
-                if let errorMessage = bot.errorMessage {
-                    Text(errorMessage)
-                        .foregroundColor(.red);
-                }
-                // Speed Control
-                TextField("Piece per Second", text: $bot.moveWaitTimeInput)
-                    .onReceive(Just(bot.moveWaitTimeInput)) { newValue in
-                        let filtered = newValue.filter { "0123456789.".contains($0) }
-                        if (filtered != bot.moveWaitTimeInput) {
-                            bot.moveWaitTimeInput = filtered;
-                        }
-                 }
-                TextField("Wait Timeout limit", text: $bot.waitTimeoutLimitInput)
-                    .onReceive(Just(bot.waitTimeoutLimitInput)) { newValue in
-                        let filtered = newValue.filter { "0123456789.".contains($0) }
-                        if (filtered != bot.waitTimeoutLimitInput) {
-                            bot.waitTimeoutLimitInput = filtered;
-                        }
-                 }
-                // Weight control
-                ForEach(bot.weights.indices, id: \.self) { index in
-                    HStack {
-                        Text(kWeightLabels[index]);
-                        TextField("",
-                                  text: $bot.weights[index]);
-                        Text(bot.weights[index]);
-                    }
-                    Divider();
-                }
-
-            }
-            Divider()
             // Image view
             if let frame = screenRecorder.frameData {
         
