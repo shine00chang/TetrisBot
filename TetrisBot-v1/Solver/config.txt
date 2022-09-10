@@ -1,0 +1,10 @@
+log_config_start
+should_log
+//use_color_grid
+
+log_config_end
+
+weights_start
+
+
+weights_end

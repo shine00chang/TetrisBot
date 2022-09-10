@@ -57,7 +57,7 @@ long long NodeIdMax = 1;
 
 // --- Logging ---
 const char* kLogFilePath = "/Users/shinechang/Documents/CS/CS-dev/TetrisBot/Logs/log1.txt";
-const char* kConfigFilePath = "./config.txt";
+const char* kConfigFilePath = "/Users/shinechang/Documents/CS/CS-dev/TetrisBot/TetrisBot-v1/Solver/config.txt";
 ofstream fs(kLogFilePath, fstream::out);
 const int kLogBufferSize = 1000;
 char logBuffer[kLogBufferSize * 2];
@@ -75,30 +75,37 @@ void Solver::loadConfigs () {
     // If file exists, read
     if (config_ifs) {
         string s;
-        getline(config_ifs, s);
         
-        while (!s.empty()) {
-            if (s.compare("log_config_start")) {
+        while (config_ifs >> s) {
+            if (s.compare("log_config_start") == 0) {
                 // -- Read Log configs
-                for (;s.compare("log_config_end"); getline(config_ifs, s)) {
+                while ((config_ifs >> s) && s.compare("log_config_end")) {
                     if (s.substr(0,2).compare("//") == 0) continue;
-                    auto pos = s.find(": ");
-                    string key = s.substr(0, pos);
-
-                    if (pos == string::npos) {
-                        string value = s.substr(pos + 2);
-                        logMap[key] = value;
-                    } else
-                        logMap[key] = "";
+                    
+                    string key = s;
+                    string value = " ";
+                    
+                    // if has parameter
+                    if (s[s.size()-1] == ':') {
+                        config_ifs >> value;
+                        key = key.substr(0, key.size()-1);
+                    }
+                    logMap[key] = value;
                 }
             }
-            if (s.compare("weights_start")) {
+            if (s.compare("weights_start") == 0) {
                 // -- Read Weights configs
-                for (;s.compare("weights_end"); getline(config_ifs, s)) {
-                    auto pos = s.find(": ");
-                    string key = s.substr(0, pos);
-                    string value = s.substr(pos + 2);
+                while ((config_ifs >> s) && s.compare("weights_end")) {
+                    if (s.substr(0,2).compare("//") == 0) continue;
                     
+                    string key = s;
+                    string value = " ";
+                    
+                    // if has parameter
+                    if (s[s.size()-1] == ':') {
+                        config_ifs >> value;
+                        key = key.substr(0, key.size()-1);
+                    }
                     weightsMap[key] = stod(value);
                 }
             }
@@ -106,7 +113,8 @@ void Solver::loadConfigs () {
     }
     // -- Set log configs --
     should_log = logMap.count("should_log");
-    
+    useColorGrid = logMap.count("use_color_grid");
+
     // -- Set weights --
     weights = default_weights;
     if (weightsMap.count("height")) weights.height = weightsMap["height"];
@@ -193,7 +201,7 @@ Node::Node() {
         id = *NodeIdPool.begin();
         NodeIdPool.erase(NodeIdPool.begin());
     }*/
-    
+    grid = new Grid();
     if (useColorGrid) {
         (*grid).resize(20);
         for (int y=0; y<20; y++)
